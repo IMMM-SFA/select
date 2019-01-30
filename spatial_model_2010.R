@@ -1,6 +1,33 @@
 library(data.table)
 library(dplyr)
 library(feather)
+library(tools)
+
+rdata_to_rds <- function(rdata_file, rds_file) {
+  
+  # get rdata object name as a string and load data
+  rdata_obj_str <- base::load(rdata_file)
+  
+  # create variable from string
+  rdata_obj <- get(rdata_obj_str)
+  
+  # save as RDS file
+  base::saveRDS(rdata_obj, rds_file)
+}
+
+
+rdata_to_feather <- function(rdata_file, feather_file) {
+  
+  # get rdata object name as a string and load data
+  rdata_obj_str <- base::load(rdata_file)
+  
+  # create variable from string
+  rdata_obj <- get(rdata_obj_str)
+  
+  # save as RDS file
+  feather::write_feather(rdata_obj, rds_file)
+}
+
 
 
 #' Import training data and extract parts.
@@ -11,7 +38,7 @@ library(feather)
 #' @export
 read_training_data <- function(training_data_file) {
   
-  training_data <- data.table::fread(tf)
+  training_data <- data.table::fread(training_data_file)
   
   # convert character fields imported as character to factor
   training_data$TPID <- as.factor(training_data$TPID)
@@ -129,6 +156,51 @@ calc_pca <- function(bu_covars, pca_file) {
 }
 
 
+#' Calculate population data
+#'
+#' @param est_df Tibble; <NEED DESCRIPTION>.
+#' @param population_grids_base_file Full path to file with file name and extension to population base year file.
+#' @param population_grids_ssp_file Full path to file with file name and extension to target SSP population file.
+#' @param beginning_training_file Full path to file with file name and extension to first part of training data.
+#' @return data.frame; Training data with updated population estimates.
+#' @export
+calc_population <- function(training_data, population_grids_base_file, population_grids_ssp_file) {
+  
+  # read in population and training data
+  pop_base <- data.table::fread(population_grids_base_file)
+  pop_ssp <- data.table::fread(population_grids_ssp_file)
+
+  # calculate population fraction and replace NaN with 0
+  training_data$beginning_training_data$ppCnt10 <- pop_ssp[,2]
+  training_data$beginning_training_data$DppC00_10 <- training_data$beginning_training_data$ppCnt10 - pop_base[,2]
+  training_data$beginning_training_data$CRppC00_10 <- training_data$beginning_training_data$DppC00_10 / pop_base[,2]
+  training_data$beginning_training_data$CRppC00_10 <- base::replace(training_data$beginning_training_data$CRppC00_10, 
+                                                                    !is.finite.data.frame(training_data$beginning_training_data$CRppC00_10),
+                                                                    0)
+  
+  return(training_data)
+}
+
+
+#' Create selected features data frame
+#'
+#' @param beginning_training_data data.frame; First nine fields in training data.
+#' @param pca_data data.frame; PCA data.
+#' @param ending_training_data data.frame; Last three fields in training data.
+#' @param select_features_file Full path to file with file name and extension to save to.
+#' @return data.frame; Bound selected features
+#' @export
+build_selected_features <- function(training_data, pca_data, selected_features_file) {
+  
+  selected_features <- cbind(training_data$beginning_training_data, pca_data, training_data$ending_training_data)
+  
+  # save output
+  #feather::write_feather(selected_features, selected_features_file)
+  
+  return(selected_features)
+}
+
+
 #' Append mask and population fields
 #'
 #' @param training_data list of data.table; <NEED DESCRIPTION>.
@@ -151,22 +223,6 @@ append_fields <- function(training_data, mask_file, select_feature_field) {
   return(training_data$est_df)
 }
 
-
-#' Append fields from training data to est_df
-#'
-#' @param training_data list of data.frame; Extracted from training data
-#' @return list of data.frame; predicted values associated with each component
-#' @export
-append_fields <- function(training_data, select_feature_field) {
-  
-  # append fields
-  training_data$est_df$GrumpLndAr <- training_data$grump_land_ar
-  training_data$est_df$ppCntT2 <- select_feature_field
-  training_data$est_df$ISO <- training_data$iso
-  training_data$est_df$TPID <- training_data$tpid
-  
-  return(training_data$est_df)
-}
 
 
 #' Generate PCA and linear model to training data.
@@ -195,7 +251,7 @@ apply_training <- function(training_data_file,
   pca_data <- calc_pca(training_data$bu_covars, pca_file)
   
   # update population data in training data and bind selected features and save output
-  selected_features <- calc_population(population_grids_base_file, population_grids_ssp_file, training_data) %>%
+  selected_features <- calc_population(training_data, population_grids_base_file, population_grids_ssp_file) %>%
     build_selected_features(pca_data, selected_features_file)
   
   # calculate general trends, format covariate file, apply mask, append fields
@@ -206,3 +262,156 @@ apply_training <- function(training_data_file,
   return(list("selected_features" = selected_features,
               "est_df" = est_df))
 }
+
+
+
+#' Process TPIDs for each GAM
+#'
+#' @param ld_df data.frame; Stores GAM outputs
+#' @param iter_file Full path with file name and extension of the file containing iteration values.
+#' @param gam_dir Full path the the GAM file directory.
+#' @param selected_features data.frame; First nine fields in training data.
+#' @param predict_status int; 0 == use GAM predict; 1 == use MGCV predict; else, do not load
+#' @return data.frame Store of GAM outputs
+#' @export
+process_iso_gam <- function(ld_df, iter_file, gam_dir, selected_features, predict_status = 0) {
+  
+  # load target stats library
+  if (predict_status == 0) {
+    library(gam)
+  }
+  else if (predict_status == 1) {
+    library(mgcv)
+  }
+  
+  iter_list <- data.table::fread(iter_file) %>%
+    names() %>%
+    as.vector()
+  
+  for (ctry in iter_list) {
+    
+    # load GAM file
+    gam_data <- file.path(gam_dir, paste0('GAMModels_LD_', ctry, '.rds')) %>%
+                  base::readRDS()
+    
+    # get records from selected features where country abbreviation in TPID
+    iso_in_gam <- selected_features[grepl(paste('^', ctry, sep=''), TPID)]
+
+    # get a vector of unique TPID codes for the target country
+    tpid_list <- as.vector(unique(iso_in_gam$TPID))
+    
+    for (target_tpid in tpid_list) {
+      
+      # get all records where TPID is target TPID
+      in_gam <- iso_in_gam[grepl(paste('^', target_tpid, sep=''), TPID)]
+      
+      curr_df <- as.data.frame(in_gam$originFID)
+      
+      curr_df$LD <- predict(gam_data[[target_tpid]], in_gam)
+      
+      ld_df <- rbind(ld_df, curr_df)
+    }
+  }
+  
+  # remove target stats library
+  if (predict_status == 0) {
+    detach("package:gam", unload=TRUE)
+    detach("package:splines", unload=TRUE)
+    detach("package:foreach", unload=TRUE)
+  }
+  else if (predict_status == 1) {
+    detach("package:mgcv", unload=TRUE)
+    detach("package:nlme", unload=TRUE)
+  }
+
+  return(ld_df)
+}
+
+
+
+# ------------------------------
+# SETUP PROJECT
+# ------------------------------
+
+root_dir <- '/Users/d3y010/projects/jing'
+data_dir <- 'data'
+gam_dir <- 'gam'
+feather_dir <- 'feather'
+training_file <- 'tbl_attr_1-8-dgr_training.csv'
+ssp = 'SSP5'
+
+# training data file 
+training_data_file <- file.path(root_dir, data_dir, training_file)
+
+bu_covars_file_store <- file.path(root_dir, data_dir, feather_dir, 'temp_tbl_attr_old.feather')
+selected_features_file <- file.path(root_dir, data_dir, feather_dir, 'temp_SelectedFeatures_projection.feather')
+
+general_trend_file_rdata <- file.path(root_dir, data_dir, 'Model_GeneralTrend.Rdata')
+general_trend_file <- file.path(root_dir, data_dir, 'Model_GeneralTrend.rds')
+#rdata_to_rds(general_trend_file_rdata, general_trend_file)
+
+pca_file_rdata <- file.path(root_dir, data_dir, 'Model_BuPca.RData')
+pca_file <- file.path(root_dir, data_dir, 'Model_BuPca.rds')
+#rdata_to_rds(pca_file_rdata, pca_file)
+
+mask_file <- file.path(root_dir, data_dir, 'data_FinalMask.csv')
+
+population_grids_base_file <- file.path(root_dir, data_dir, 'data_2000TotalPop_SSPBaseYr.csv')
+population_grids_ssp_file <- file.path(root_dir, data_dir, paste0('data_', ssp, 'TotalPopSeries.csv'))
+
+iso3_except_file <- file.path(root_dir, data_dir,'ISO3s_exceptions.csv')
+iso3_include_file <- file.path(root_dir, data_dir,'ISO3s.csv')
+
+
+
+gam_dir = file.path(root_dir, data_dir, gam_dir)
+
+
+
+
+# ------------------------------
+# END PROJECT SETUP
+# ------------------------------
+
+
+
+# ------------------------------
+# MAIN
+# ------------------------------
+
+# outputs trained_output$selected_features, trained_output$est_df
+trained_output <- apply_training(training_data_file,
+                                 pca_file,
+                                 population_grids_base_file,
+                                 population_grids_ssp_file,
+                                 selected_features_file,
+                                 general_trend_file,
+                                 mask_file)
+
+
+
+# generalized additive model
+ld_df <- data.frame()
+
+# START HERE Figure out Error in 1:object$nsdf error - this ran after running original version first
+
+# TODO:  is `gam` and `mgcv` package being used? Is is supposed to be using the nested `predict` methods?
+# process ISO exceptions and inclusions
+ld_df <- process_iso_gam(ld_df, iso3_except_file, gam_dir, trained_output$selected_features, predict_status = 0) %>% 
+            process_iso_gam(iso3_include_file, gam_dir, trained_output$selected_features, predict_status = 1)
+
+colnames(ld_df) <- c("originFID", "LD")
+
+# sort data frame by feature id
+ld_df <- ld_df[order(ld_df$originFID),]
+
+
+
+
+
+
+
+
+# tests
+all.equal(current=data.table::setDT(estDF), target=trained_output$est_df)
+all.equal(current=data.table::setDT(selectedFeatures), target=trained_output$selected_features)
