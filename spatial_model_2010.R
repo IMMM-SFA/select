@@ -328,6 +328,54 @@ process_iso_gam <- function(ld_df, iter_file, gam_dir, selected_features, predic
 }
 
 
+#' Sort data frame by column values
+#'
+#' @param df data.frame; In data frame
+#' @param col Name of column to sort by.
+#' @return data.frame
+#' @export
+sort_df_by_column <- function(df, col) {
+  
+  return(df[base::order(df[,col]),])
+}
+
+#' Rename all columns in a data frame
+#'
+#' @param df data.frame; In data frame
+#' @param col_list list; List of column names (e.g.: `c("col_1", "col_2")`)
+#' @return data.frame
+#' @export
+rename_columns <- function(df, col_list) {
+  
+  return(base::colnames(df) <- col_list)
+}
+
+
+#' Load GAM data frame and aggregate with general trends
+#'
+#' @param trained_output list of data.frame; Trained data output.
+#' @param gam_dir Full path to the directory containing the GAM data.
+#' @param iso3_except_file Full path with file name and extension to the ISO exeption file.
+#' @param iso3_include_file Full path with file name and extension to the ISO inclusion file.
+#' @return list of data.frame; Trained output with modified columns.
+#' @export
+aggregate_gt_with_gam <- function(trained_output, gam_dir, iso3_except_file, iso3_include_file) {
+  
+  # generalized additive model
+  ld_df <- data.frame()
+  
+  # TODO:  is `gam` and `mgcv` package being used? Is it supposed to be using the nested `predict` methods?
+  # process ISO exceptions and inclusions
+  ld_df <- process_iso_gam(ld_df, iso3_except_file, gam_dir, trained_output$selected_features, predict_status = 0) %>% 
+    process_iso_gam(iso3_include_file, gam_dir, trained_output$selected_features, predict_status = 1) %>%
+    rename_columns(c("originFID", "LD")) %>%
+    sort_df_by_column("originFID")
+  
+  # build aggregated field
+  trained_output$est_df$newD <- trained_output$est_df$GT + ld_df$LD
+  
+  return(trained_output)
+}
 
 # ------------------------------
 # SETUP PROJECT
@@ -386,24 +434,19 @@ trained_output <- apply_training(training_data_file,
                                  population_grids_ssp_file,
                                  selected_features_file,
                                  general_trend_file,
-                                 mask_file)
+                                 mask_file) %>%
+                  aggregate_gt_with_gam(trained_output, 
+                                        gam_dir, 
+                                        iso3_except_file, 
+                                        iso3_include_file)
 
 
 
-# generalized additive model
-ld_df <- data.frame()
 
-# START HERE Figure out Error in 1:object$nsdf error - this ran after running original version first
 
-# TODO:  is `gam` and `mgcv` package being used? Is is supposed to be using the nested `predict` methods?
-# process ISO exceptions and inclusions
-ld_df <- process_iso_gam(ld_df, iso3_except_file, gam_dir, trained_output$selected_features, predict_status = 0) %>% 
-            process_iso_gam(iso3_include_file, gam_dir, trained_output$selected_features, predict_status = 1)
 
-colnames(ld_df) <- c("originFID", "LD")
+  
 
-# sort data frame by feature id
-ld_df <- ld_df[order(ld_df$originFID),]
 
 
 
