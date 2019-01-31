@@ -408,34 +408,35 @@ calc_parallel_max_min <- function(trained_output) {
 # SETUP PROJECT
 # ------------------------------
 
-root_dir <- '/Users/d3y010/projects/jing'
-data_dir <- 'data'
+data_dir <- '/Users/d3y010/projects/jing/data'
 gam_dir <- 'gam'
 feather_dir <- 'feather'
 training_file <- 'tbl_attr_1-8-dgr_training.csv'
 ssp = 'SSP5'
 
 # training data file 
-training_data_file <- file.path(root_dir, data_dir, training_file)
+training_data_file <- file.path(data_dir, training_file)
 
-bu_covars_file_store <- file.path(root_dir, data_dir, feather_dir, 'temp_tbl_attr_old.feather')
-selected_features_file <- file.path(root_dir, data_dir, feather_dir, 'temp_SelectedFeatures_projection.feather')
+bu_covars_file_store <- file.path(data_dir, feather_dir, 'temp_tbl_attr_old.feather')
+selected_features_file <- file.path(data_dir, feather_dir, 'temp_SelectedFeatures_projection.feather')
 
-general_trend_file_rdata <- file.path(root_dir, data_dir, 'Model_GeneralTrend.Rdata')
-general_trend_file <- file.path(root_dir, data_dir, 'Model_GeneralTrend.rds')
+general_trend_file_rdata <- file.path(data_dir, 'Model_GeneralTrend.Rdata')
+general_trend_file <- file.path(data_dir, 'Model_GeneralTrend.rds')
 #rdata_to_rds(general_trend_file_rdata, general_trend_file)
 
-pca_file_rdata <- file.path(root_dir, data_dir, 'Model_BuPca.RData')
-pca_file <- file.path(root_dir, data_dir, 'Model_BuPca.rds')
+pca_file_rdata <- file.path(data_dir, 'Model_BuPca.RData')
+pca_file <- file.path(data_dir, 'Model_BuPca.rds')
 #rdata_to_rds(pca_file_rdata, pca_file)
 
-mask_file <- file.path(root_dir, data_dir, 'data_FinalMask.csv')
+mask_file <- file.path(data_dir, 'data_FinalMask.csv')
 
-population_grids_base_file <- file.path(root_dir, data_dir, 'data_2000TotalPop_SSPBaseYr.csv')
-population_grids_ssp_file <- file.path(root_dir, data_dir, paste0('data_', ssp, 'TotalPopSeries.csv'))
+population_grids_base_file <- file.path(data_dir, 'data_2000TotalPop_SSPBaseYr.csv')
+population_grids_ssp_file <- file.path(data_dir, paste0('data_', ssp, 'TotalPopSeries.csv'))
 
-iso3_except_file <- file.path(root_dir, data_dir,'ISO3s_exceptions.csv')
-iso3_include_file <- file.path(root_dir, data_dir,'ISO3s.csv')
+iso3_except_file <- file.path(data_dir,'ISO3s_exceptions.csv')
+iso3_include_file <- file.path(data_dir,'ISO3s.csv')
+
+tp_pp_bu_file <- file.path(data_dir, "data_2000TPppBU.csv")
 
 
 
@@ -462,8 +463,7 @@ trained_output <- apply_training(training_data_file,
                                  selected_features_file,
                                  general_trend_file,
                                  mask_file) %>%
-                  aggregate_gt_with_gam(trained_output, 
-                                        gam_dir, 
+                  aggregate_gt_with_gam(gam_dir, 
                                         iso3_except_file, 
                                         iso3_include_file) %>%
                   calc_parallel_max_min()
@@ -474,14 +474,194 @@ all.equal(current=data.table::setDT(estDF), target=trained_output$est_df)
 all.equal(current=data.table::setDT(selectedFeatures), target=trained_output$selected_features)
 
 
+run_part <- function(training_outputs, data_dir, tp_pp_bu_file, ssp) {
+  
+  national_bu_amounts_list <- data.table.fread(file.path(data_dir, paste0("data_NationalBuAmts_", ssp, ".csv")))
+  national_bu_amounts_list$BUAmtChg <- national_bu_amounts_list[,3] - national_bu_amounts_list[,2]
+  
+  tp_pp_bu_list <- data.table.fread(tp_pp_bu_file)
+  
+  # "NATIONAL" total amount control: update newR, newD
+  ctry_list <- as.vector(unique(training_outputs$est_df$ISO))
+  allo_df <- data.frame()
+  
+  
+  for (ctry in ctry_list) {
+    
+    ctry_est_df <- training_outputs$est_df[grepl(paste("^", ctry, sep=""), ISO)]
+    sum_avail_lnd <- sum(ctry_est_df$availLnd)
+    
+    ctry_bu_chg <- national_bu_amounts_list[grepl(paste("^", ctry, "$", sep=""), BUAmtChg)]
+    sum_amt_d <- sum(ctry_est_df$amtD)
+    
+    if (ctry_bu_chg == 0) {
+      curr_allo_df <- as.data.frame()
+      currAlloDF <- as.data.frame(ctryEstDF$originFID)
+      colnames(currAlloDF) <- "originFID"
+      currAlloDF$newR <- ctryEstDF$rT1
+      currAlloDF$newD <- 0
+      alloDF <- rbind(alloDF, currAlloDF)
+      print(paste(CTRY, ": mode 0 (no change)", sep=""))
+      
+    } 
+  
+}
 
-NatDecBUAmtList <- read.csv(paste0("data_NationalBUAmts_", currSSP, ".csv"))
-NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,3] - NatDecBUAmtList[,2]
+for (CTRY in CtryList) {
+  ctryEstDF <- subset(estDF, grepl(paste("^", CTRY, "$", sep=""), estDF$ISO))
+  
+  sumAvailLnd <- sum(ctryEstDF$availLnd)
+  ctryBUChg <- subset(NatDecBUAmtList, grepl(paste("^", CTRY, "$", sep=""), NatDecBUAmtList$ISO3v10))$BUAmtChg
+  sumAmtD <- sum(ctryEstDF$amtD)
+  
+  if (ctryBUChg == 0) {
+    currAlloDF <- as.data.frame(ctryEstDF$originFID)
+    colnames(currAlloDF) <- "originFID"
+    currAlloDF$newR <- ctryEstDF$rT1
+    currAlloDF$newD <- 0
+    alloDF <- rbind(alloDF, currAlloDF)
+    print(paste(CTRY, ": mode 0 (no change)", sep=""))
+    
+  } else if (sumAvailLnd <= ctryBUChg) {
+    currAlloDF <- as.data.frame(ctryEstDF$originFID)
+    colnames(currAlloDF) <- "originFID"
+    currAlloDF$newR <- ctryEstDF$mask
+    currAlloDF$newD <- currAlloDF$newR - ctryEstDF$rT1
+    currAlloDF$newD <- ifelse(currAlloDF$newD < 0, 0, currAlloDF$newD) # in case of rounding error
+    alloDF <- rbind(alloDF, currAlloDF)
+    print(paste(CTRY, ": mode 1 (total overflows avail land)", sep=""))
+    
+  } else { # sumAvailLnd > ctryBUChg
+    tpidList <- as.vector(unique(ctryEstDF$TPID))
+    tpidDistrDF <- as.data.frame(tapply(ctryEstDF$ppCntT2, ctryEstDF$TPID, sum))
+    colnames(tpidDistrDF) <- "ppCntT2"
+    tpidDistrDF$availLnd <- as.vector(tapply(ctryEstDF$availLnd, ctryEstDF$TPID, sum))
+    tpidDistrDF <- subset(tpidDistrDF, !is.na(tpidDistrDF$ppCntT2))
+    tpidDistrDF$TPID <- row.names(tpidDistrDF)
+    library("dplyr")
+    tpidDistrDF <- left_join(tpidDistrDF, TPppBUList, by = "TPID")
+    detach("package:dplyr", unload=TRUE)
+    tpidDistrDF$ppCntT2 <- tpidDistrDF$ppCntT2 / 1000000 * tpidDistrDF$ppBU00_m.2
+    
+    sumT2Pop <- sum(tpidDistrDF$ppCntT2)
+    tpidDistrDF$tpidBUChg <- ctryBUChg * tpidDistrDF$ppCntT2 / sumT2Pop
+    tpidDistrDF$overflow <- tpidDistrDF$tpidBUChg - tpidDistrDF$availLnd
+    sumTpidOverflow <- sum(tpidDistrDF$overflow[tpidDistrDF$overflow > 0])
+    
+    while (sumTpidOverflow > 0) {
+      sumT2Pop <- sum(tpidDistrDF$ppCntT2[tpidDistrDF$overflow < 0])
+      tpidDistrDF$tpidBUChg <- ifelse(tpidDistrDF$overflow < 0,
+                                      (sumTpidOverflow * tpidDistrDF$ppCntT2 / sumT2Pop + tpidDistrDF$tpidBUChg),
+                                      tpidDistrDF$availLnd)
+      tpidDistrDF$overflow <- tpidDistrDF$tpidBUChg - tpidDistrDF$availLnd
+      sumTpidOverflow <- sum(tpidDistrDF$overflow[tpidDistrDF$overflow > 0])
+    }
+    rm(sumT2Pop, sumTpidOverflow)
+    
+    for (currTPID in tpidList) {
+      tpidEstDF <- subset(ctryEstDF, grepl(paste("^", currTPID, "$", sep=""), ctryEstDF$TPID))
+      
+      sumAvailLnd <- sum(tpidEstDF$availLnd)
+      tpidBUChg <- subset(tpidDistrDF, grepl(paste("^", currTPID, "$", sep=""), tpidDistrDF$TPID))$tpidBUChg
+      sumAmtD <- sum(tpidEstDF$amtD)
+      
+      if (sumAmtD == 0) {
+        sumRT1 <- sum(tpidEstDF$rT1)
+        scaler <- tpidBUChg / sumRT1
+        tpidEstDF$amtD <- tpidEstDF$rT1 * scaler
+        
+        tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
+        sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
+        tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
+        
+        while (sumOverflow > 0) {
+          sumRT1 <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$rT1)
+          scaler <- sumOverflow / sumRT1
+          tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, (tpidEstDF$rT1 * scaler + tpidEstDF$amtD), tpidEstDF$amtD)
+          tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
+          sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
+          tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
+        }
+        
+        rm(scaler, sumOverflow)
+        tpidEstDF$newD <- tpidEstDF$amtD / tpidEstDF$GrumpLndAr
+        tpidEstDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
+        tpidEstDF$newR <- pmax(tpidEstDF$newR, tpidEstDF$rT1, na.rm = TRUE)
+        tpidEstDF$newR <- pmin(tpidEstDF$newR, tpidEstDF$mask, na.rm = TRUE)
+        tpidEstDF$newD <- tpidEstDF$newR - tpidEstDF$rT1
+        tpidEstDF$newD <- ifelse(tpidEstDF$newD < 0, 0, tpidEstDF$newD) # in case of rounding error
+        
+        currAlloDF <- as.data.frame(tpidEstDF$originFID)
+        colnames(currAlloDF) <- "originFID"
+        currAlloDF$newR <- tpidEstDF$newR
+        currAlloDF$newD <- tpidEstDF$newD
+        alloDF <- rbind(alloDF, currAlloDF)
+        print(paste(currTPID, ": mode 2 (potential = 0, iteratively fill according to rT1)", sep=""))
+        
+      } else if (sumAmtD >= tpidBUChg) {
+        scaler <- tpidBUChg / sumAmtD
+        tpidEstDF$newD <- tpidEstDF$newD * scaler
+        rm(scaler)
+        currAlloDF <- as.data.frame(tpidEstDF$originFID)
+        colnames(currAlloDF) <- "originFID"
+        currAlloDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
+        currAlloDF$newR <- pmin(currAlloDF$newR, tpidEstDF$mask, na.rm = TRUE) # in case of rounding error
+        currAlloDF$newD <- tpidEstDF$newD
+        alloDF <- rbind(alloDF, currAlloDF)
+        print(paste(currTPID, ": mode 3 (potential >= total, proportionally scale down)", sep=""))
+        
+      } else { # sumAmtD < tpidBUChg
+        scaler <- tpidBUChg / sumAmtD
+        tpidEstDF$amtD <- tpidEstDF$amtD * scaler
+        
+        tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
+        sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
+        tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
+        
+        while (sumOverflow > 0) {
+          sumAmtD <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$amtD)
+          if (sumAmtD > 0) {
+            scaler <- sumOverflow / sumAmtD
+            tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, (tpidEstDF$amtD * scaler + tpidEstDF$amtD), tpidEstDF$amtD)
+          } else {
+            sumRT1 <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$rT1)
+            scaler <- sumOverflow / sumRT1
+            tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, (tpidEstDF$rT1 * scaler + tpidEstDF$amtD), tpidEstDF$amtD)
+          }
+          tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
+          sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
+          tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
+        }
+        
+        rm(scaler, sumOverflow)
+        tpidEstDF$newD <- tpidEstDF$amtD / tpidEstDF$GrumpLndAr
+        tpidEstDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
+        tpidEstDF$newR <- pmax(tpidEstDF$newR, tpidEstDF$rT1, na.rm = TRUE)
+        tpidEstDF$newR <- pmin(tpidEstDF$newR, tpidEstDF$mask, na.rm = TRUE)
+        tpidEstDF$newD <- tpidEstDF$newR - tpidEstDF$rT1
+        tpidEstDF$newD <- ifelse(tpidEstDF$newD < 0, 0, tpidEstDF$newD) # in case of rounding error
+        
+        currAlloDF <- as.data.frame(tpidEstDF$originFID)
+        colnames(currAlloDF) <- "originFID"
+        currAlloDF$newR <- tpidEstDF$newR
+        currAlloDF$newD <- tpidEstDF$newD
+        alloDF <- rbind(alloDF, currAlloDF)
+        print(paste(currTPID, ": mode 4 (potential < total, iteratively fill)", sep=""))
+      }
+    }
+  }
+}
+rm(CTRY, CtryList, ctryBUChg, sumAmtD, sumAvailLnd, ctryEstDF, currAlloDF, NatDecBUAmtList, sumRT1,
+   currTPID, tpidBUChg, tpidList, tpidDistrDF, TPppBUList, tpidEstDF)
+# colnames(alloDF) <- c("originFID", "newR", "newD")
 
-# "NATIONAL" total amount control: update newR, newD
-CtryList <- as.vector(unique(estDF$ISO))
-alloDF <- data.frame()
-TPppBUList <- read.csv("data_2000TPppBU.csv")
+estDF <- estDF[order(estDF$originFID),]
+alloDF <- alloDF[order(alloDF$originFID),]
+
+alloDF$newA <- alloDF$newD - estDF$dT0T1
+write.csv(alloDF, file = paste0("tbl_inputToArcGIS_", currSSP, "_2010.csv"))
+rm(estDF, alloDF, currSSP)
+
 
 
 
