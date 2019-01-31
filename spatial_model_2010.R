@@ -377,6 +377,33 @@ aggregate_gt_with_gam <- function(trained_output, gam_dir, iso3_except_file, iso
   return(trained_output)
 }
 
+
+#' Calculate parallel maxima and minima
+#'
+#' @param trained_output list of data.frame; Trained data output.
+#' @return list of data.frame; Trained output with modified columns.
+#' @export
+calc_parallel_max_min <- function(trained_output) {
+  
+  trained_output$est_df$newR <- trained_output$est_df$rT1 + trained_output$est_df$newD
+  trained_output$est_df$newR <- pmax(trained_output$est_df$newR, trained_output$est_df$rT1, na.rm = TRUE)
+  trained_output$est_df$newR <- pmin(trained_output$est_df$newR, trained_output$est_df$mask, na.rm = TRUE)
+  trained_output$est_df$newD <- trained_output$est_df$newR - trained_output$est_df$rT1
+  
+  # in case of rounding error
+  trained_output$est_df$newD <- ifelse(trained_output$est_df$newD < 0, 0, trained_output$est_df$newD)
+  
+  trained_output$est_df$amtD <- trained_output$est_df$GrumpLndAr * trained_output$est_df$newD
+  trained_output$est_df$availLnd <- trained_output$est_df$GrumpLndAr * (trained_output$est_df$mask - trained_output$est_df$rT1)
+  
+  # in case of rounding error
+  trained_output$est_df$availLnd <- ifelse(trained_output$est_df$availLnd < 0, 0, trained_output$est_df$availLnd)
+  
+  return(trainind_output)
+}
+
+
+
 # ------------------------------
 # SETUP PROJECT
 # ------------------------------
@@ -438,23 +465,28 @@ trained_output <- apply_training(training_data_file,
                   aggregate_gt_with_gam(trained_output, 
                                         gam_dir, 
                                         iso3_except_file, 
-                                        iso3_include_file)
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
+                                        iso3_include_file) %>%
+                  calc_parallel_max_min()
 
 
 # tests
 all.equal(current=data.table::setDT(estDF), target=trained_output$est_df)
 all.equal(current=data.table::setDT(selectedFeatures), target=trained_output$selected_features)
+
+
+
+NatDecBUAmtList <- read.csv(paste0("data_NationalBUAmts_", currSSP, ".csv"))
+NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,3] - NatDecBUAmtList[,2]
+
+# "NATIONAL" total amount control: update newR, newD
+CtryList <- as.vector(unique(estDF$ISO))
+alloDF <- data.frame()
+TPppBUList <- read.csv("data_2000TPppBU.csv")
+
+
+
+
+
+
+
+
