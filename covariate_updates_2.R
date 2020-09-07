@@ -99,6 +99,24 @@ focal_max <- function(attribute_tble, variable_arr, size) {
     colnames(output_max[f]) <- paste("max",f,sep = "_")
   }
   return(output_max)
+  
+  #' derive slope range, iterating variable arrangement 
+  #' @param attribute_tble
+  #' @param output_mean
+  #' @param output_sd
+  #' @return output_std_pos
+  #' @importFrom
+  #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
+  #' @export
+  slope_range <- function(attribute_tble,variable_arr,output_max,output_min){
+    output_slp_rnge <- data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
+    for (f in variable_arr){
+      output_slp_rnge[f] <- (output_max[f])- output_min[f]
+      names(output_slp_rnge[,f]) <- paste0("slp_rnge",f,sep = "_")
+    }
+    return(output_std_pos)
+  }
+  
 }
 
 #' combine attribute table, mean output, sd output and std pos output in one dataframe
@@ -110,14 +128,13 @@ focal_max <- function(attribute_tble, variable_arr, size) {
 #' @importFrom dplyr bind_cols
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export 
-focal_sd <- function(attribute_tble, output_mean, output_sd, output_std_pos) {
+create_focal_tble <- function(attribute_tble, output_mean, output_sd, output_std_pos, output_min, output_max) {
   attr_tble <- attribute_tble[,1:5]
   mean_out  <- output_mean[,4:6]
   sd_out  <- output_sd[,4:6]
   std_pos_out  <- output_std_pos[,4:6]
-  min_out  <- output_min[,4:6]
-  max_out  <- output_max[,4:6]
-  focal_attribute_tble <- bind_cols(attr_tble, mean_out,sd_out,std_pos_out, min_out, max_out)
+  slp_rnge_out  <- output_slp_rnge[,4:6]
+  focal_attribute_tble <- bind_cols(attr_tble, mean_out,sd_out,std_pos_out, slp_rnge_out)
   names(focal_attribute_tble[,6:20]) <- c("mean_newR", "mean_newD", "mean_newA",
                                           "sd_newR", "sd_newD", "sd_newA",
                                           "std_pos_newR", "std_pos_newD", "std_pos_newA",
@@ -135,24 +152,6 @@ focal_sd <- function(attribute_tble, output_mean, output_sd, output_std_pos) {
 spatial_join <- function(centroid_shp, focal_attribute_tble) {
   centroid_lyr <- merge(centroid_shp,  focal_attribute_tble)
   return(centroid_lyr)
-}
-
-#' Convert attributes to rasters, using iterations
-#'
-#' @param centroid_attr
-#' @param raster_benchmark
-#' @param variable_arr
-#' @return raster_output
-#' @importFrom raster rasterize writeRaster
-#' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
-#' @export
-raster_slope <- function(centroid_lyr, raster_benchmark, variable_arr) {
-  for (f in variable_arr){
-      raster_lyr[f] <- rasterize(centroid_lyr[f], raster_benchmark, fun=mean)
-                                 #filename = paste(f,"output_raster",sep="_"))
-      raster_slope[f] <- terrain(raster_lyr[f], opt="slope", unit="radians", neighbors=size)
-                                 #filename=(f,"output_slope",sep="_"))
-  }
 }
 
 #' convert 1/8-dgr fishnet to centroids
