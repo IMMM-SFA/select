@@ -114,7 +114,7 @@ focal_max <- function(attribute_tble, variable_arr, size) {
       output_slp_rnge[f] <- (output_max[f])- output_min[f]
       names(output_slp_rnge[,f]) <- paste0("slp_rnge",f,sep = "_")
     }
-    return(output_std_pos)
+    return(output_slp_rnge)
   }
   
 }
@@ -135,11 +135,12 @@ create_focal_tble <- function(attribute_tble, output_mean, output_sd, output_std
   std_pos_out  <- output_std_pos[,4:6]
   slp_rnge_out  <- output_slp_rnge[,4:6]
   focal_attribute_tble <- bind_cols(attr_tble, mean_out,sd_out,std_pos_out, slp_rnge_out)
-  names(focal_attribute_tble[,6:20]) <- c("mean_newR", "mean_newD", "mean_newA",
+   names(focal_attribute_tble)[3:length(focal_attribute_tble)] <- c(
+                                          "new_R","new_D","new_A",
+                                          "mean_newR", "mean_newD", "mean_newA",
                                           "sd_newR", "sd_newD", "sd_newA",
                                           "std_pos_newR", "std_pos_newD", "std_pos_newA",
-                                          "min_newR", "min_newD", "min_newA",
-                                          "max_newR", "max_newD", "max_newA")
+                                          "slp_rnge_newR", "slp_rnge_newD", "slp_rnge_newA")
   return(focal_attribute_tble)
 }
 
@@ -161,9 +162,8 @@ spatial_join <- function(centroid_shp, focal_attribute_tble) {
 #' @importFrom sf st_centroid
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-compute_centriod <- function(centroid_lyr, variable_arr){
-  for (f in variable_arr){
-    centroids <- st_centroid(centroid_shp)
+compute_centriod <- function(centroid_lyr, focal_attribute_tble){
+    centroids <- st_centroid(centroid_lyr)
   }
   return(centriods)
 }
@@ -171,9 +171,13 @@ compute_centriod <- function(centroid_lyr, variable_arr){
 # extract raster values to centroids
 #' @param raster_benchmark
 #' @return centriods
-#' @importFrom raster exract
+#' @importFrom raster extract
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-#' 
- centroids$chmMaxShape <- raster::extract(chm, centShape, weights=FALSE, fun=max)
+extract_raster <- function(centroid_lyr, variable_arr){
+  for (f in variable_arr){
+    raster_test <- rasterize(centroid_lyr, raster_benchmark)
+  }
+  return(centriods)
+}
 
