@@ -156,28 +156,27 @@ spatial_join <- function(centroid_shp, focal_attribute_tble) {
 }
 
 #' convert 1/8-dgr fishnet to centroids
-#' @param centroid_shp
-#' @param variable_arr
-#' @return centriods
+#' @param centroid_lyr
+#' @return centroids
 #' @importFrom sf st_centroid
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-compute_centriod <- function(centroid_lyr, focal_attribute_tble){
+compute_centriod <- function(centroid_lyr){
     centroids <- st_centroid(centroid_lyr)
-  }
-  return(centriods)
+  return(centroids)
 }
 
 # extract raster values to centroids
 #' @param raster_benchmark
-#' @return centriods
-#' @importFrom raster extract
+#' @param centroid_lyr
+#' @param variable_arr
+#' @return raster_lyr
+#' @importFrom raster rasterize
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-extract_raster <- function(centroid_lyr, variable_arr){
-  for (f in variable_arr){
-    raster_test <- rasterize(centroid_lyr, raster_benchmark)
-  }
-  return(centriods)
+extract_raster <- function(raster_benchmark, centroid_lyr){
+    raster_lyr <- rasterize(centroid_lyr, raster_benchmark)
+  return( raster_lyr)
 }
+
 
