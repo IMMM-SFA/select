@@ -155,15 +155,52 @@ spatial_join <- function(centroid_shp, focal_attribute_tble) {
   return(centroid_lyr)
 }
 
-#' convert 1/8-dgr fishnet to centroids
+#' #' convert 1/8-dgr fishnet to centroids
+#' #' @param centroid_lyr
+#' #' @return centroids
+#' #' @importFrom sf st_centroid
+#' #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
+#' #' @export
+#' compute_centriod <- function(centroid_lyr){
+#'     centroids <- st_centroid(centroid_shp)
+#'   return(centroids)
+#' }
+
+# create rasters from the centroid layer
+#' @param raster_benchmark
 #' @param centroid_lyr
-#' @return centroids
-#' @importFrom sf st_centroid
+#' @param variable_arr
+#' @return raster_lyr
+#' @importFrom raster rasterize
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-compute_centriod <- function(centroid_lyr){
-    centroids <- st_centroid(centroid_lyr)
-  return(centroids)
+extract_raster <- function(centroid_lyr){
+  raster_lyr=list()
+  for (i in names(centroid_lyr)){
+  raster_lyr[i] = raster(centroid_lyr[i])
+  }
+  return( raster_lyr)
+}
+
+# create rasters from the centroid layer
+#' @param raster_lyr
+#' @importFrom ggplot2 ggplot
+#' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
+#' @export
+plot_raster <- function(raster_lyr){
+  plot_list = list()
+  for (i in names(raster_layer)) {
+    p = ggplot(raster_layer)
+    plot_list[[i]] = p
+  }
+
+  # Save plots to tiff. Makes a separate file for each plot.
+  for (i in names(raster_layer)) {
+    file_name = paste("raster_plot_", i, ".tiff", sep="")
+    tiff(file_name)
+    print(plot_list[[i]])
+    dev.off()
+  }
 }
 
 # extract raster values to centroids
@@ -174,9 +211,18 @@ compute_centriod <- function(centroid_lyr){
 #' @importFrom raster rasterize
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-extract_raster <- function(raster_benchmark, centroid_lyr){
-    raster_lyr <- rasterize(centroid_lyr, raster_benchmark)
-  return( raster_lyr)
+extract_raster <- function(centroid_lyr){
+  raster_list  <- names(raster_lyr)
+  for (i in seq_along(raster_list)){
+    rasValue[i] = extract(raster(raster_lyr[i]), centroid_shp)
+    combinePointValue[i] = cbind(centroid_shp,rasValue[i])
+    write.table(combinePointValue[i],file=paste("combinedPointValue",raster_list[i],".csv",sep=""), 
+    append=FALSE, sep= ",", row.names = FALSE, col.names=TRUE)
+  }
 }
+
+
+
+
 
 
