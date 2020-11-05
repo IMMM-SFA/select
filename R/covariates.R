@@ -1,20 +1,16 @@
-#' Analysis tools for spatial model projection Covariates
-setwd("C:\\Users\\mcgr323\\projects\\select\\LandMask_1-8-degree_DATA")
-attribute_tble = import("tbl_inputToArcGIS_SSP5_2010.csv")
-centroid_shp = st_read(file.path(workspace_path,"LandMask_1-8-degree_fishnet_centroids.shp"))
-raster_benchmark = raster(file.path(workspace_path,"LandMask_1-8-degree_raster.img"))
-variable_arr <- c('newR', 'newD', 'newA')
-size_arr <- c(3,5,7,9)
 
-#' # create slope dataframe from rasters 
-#' #' @param attribute_tble
-#' #' @param centroid_shp
-#' #' @param variable_arr
-#' #' @return output_slope
-#' #' @importFrom landsat slopeasp
-#' #' @importFrom raster raster
-#' #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
-#' #' @export
+#' calculate slope
+#'
+#' @details create slope dataframe from rasters
+#'
+#' @param attribute_tble
+#' @param centroid_shp
+#' @param variable_arr
+#' @importFrom landsat slopeasp
+#' @importFrom raster raster
+#' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
+#' @return output_slope
+#' @export
 raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
   #create empty slope dataframe to store output
   output_slope = data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
@@ -25,10 +21,10 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
     y = coor$Y
     #get elevation from the attribute table
     z = attribute_tble[,f]
-    #create matrix 
+    #create matrix
     pts <- as.data.frame(matrix(c(x,y,z),  ncol=3,  byrow=FALSE))
     colnames(pts)=c("x", "y", "z")
-    coordinates(pts) = ~x+y 
+    coordinates(pts) = ~x+y
     # Convert "pts" SpatialPointDataFrame to SpatialPixelsDataFrame
     spdf <- as(pts, 'SpatialPixelsDataFrame')
     # Convert the SpatialPixelsDataFrame (sgdf) to spatialGridDataFrame
@@ -37,7 +33,7 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
     slope = slopeasp(sgdf)
     #convert to raster
     r <- raster(slope$slope)
-    #extract values from raster at centroids 
+    #extract values from raster at centroids
     output_slope[f] =as.data.frame(extract(r, centroid_shp))
   }
   #name the columns
@@ -45,13 +41,13 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
   #change from degrees to percent slope
   output_slope[output_slope > 45] <- NA #anything more than 45 is NA (45 deg = 100%)
   output_slope = (output_slope* pi/180)*100
-  #NA to 0 to match python script 
+  #NA to 0 to match python script
   slope_data[is.na(slope_data)] <- 0
   return(output_slope)
 }
 
 
-#' create dataframe of focal statistica from variable arrangement in attribute table 
+#' create dataframe of focal statistica from variable arrangement in attribute table
 #' @param attribute_tble
 #' @param putput_slope
 #' @param variable_arr
@@ -59,14 +55,14 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
 #' @return focal_data
 #' @importFrom zoo rollapply
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
-#' @export 
+#' @export
 focal_stats = function(attribute_tble, variable_arr, size) {
-  #create empty dataframes 
+  #create empty dataframes
   output_mean = data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
   output_sd = data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
   output_std_pos = data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
   output_slp_rnge = data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
-  #populate dataframes with mean, sd, std pos and range for each variable in attribute table  
+  #populate dataframes with mean, sd, std pos and range for each variable in attribute table
   for (f in variable_arr){
     output_mean[f] =     rollapply(attribute_tble[,f],size, function(x) mean(x),fill = NA)
     output_sd[f] =       rollapply(attribute_tble[,f],size, function(x) sd(x),fill = NA)
@@ -77,7 +73,7 @@ focal_stats = function(attribute_tble, variable_arr, size) {
   #bind the focal stat data together and nme columns
   focal_data = bind_cols(output_mean[,4:6],output_sd[,4:6],
                          output_std_pos[,4:6], output_slp_rnge[,4:6])
-  #name the columns 
+  #name the columns
   colnames(focal_data) = c(
      "mean_newR", "mean_newD", "mean_newA",
      "sd_newR", "sd_newD", "sd_newA",
@@ -109,7 +105,7 @@ spatial_join <- function(centroid_shp,attribute_tble) {
 #' @importFrom dplyr cbind
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-combine_df <- function(cent_lyr, output_slope, focal_3, focal_5, focal_7, focal_9, ){
+combine_df <- function(cent_lyr, output_slope, focal_3, focal_5, focal_7, focal_9){
   names(output_slope) = c(
     "newR_slope", "newD_slope", "newA_slope")
   names(focal_3) = c(
