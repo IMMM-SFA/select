@@ -2,11 +2,23 @@ Package: select
 Type: Package
 Title: What the Package Does (Title Case)
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
+Author@R: c(person("Jing", "Gao", email = "a.b@pnnl.gov", role = c("aut", "cre")),
+         person("Casey", "McGrath", email = "a.b@pnnl.gov", role = "aut"),
+         person("Chris", "Vernon", email = "chris.vernon@pnnl.gov", role = "aut"))
+Maintainer: Casey McGrath <yourself@somewhere.net>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+License: BSD2-Clause
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 6.1.1
+Imports: 
+    fasterize
+Depends:
+    R (>= 3.6.0)
+RoxygenNote: 7.1.1
+VignetteBuilder: knitr
+Suggests:
+    testthat (>= 2.1.0),
+    knitr,
+    rmarkdown,
+    pkgdown
