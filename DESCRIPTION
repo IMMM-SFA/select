@@ -1,18 +1,28 @@
 Package: select
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Derive focal statistics for SELECT model data
 Version: 0.1.0
-Author@R: c(person("Jing", "Gao", email = "a.b@pnnl.gov", role = c("aut", "cre")),
-         person("Casey", "McGrath", email = "a.b@pnnl.gov", role = "aut"),
-         person("Chris", "Vernon", email = "chris.vernon@pnnl.gov", role = "aut"))
+Author@R:c(person("Jing", "Gao", 
+            email = "jinggao@udel.edu", 
+            role = "aut"),
+            person("Casey", "McGrath", 
+	        email = "casey.mcgrath@pnnl.gov", 
+	        role = "aut"),
+	        person("Chris", "Vernon", 
+	        email = "chris.vernon@pnnl.gov", 
+	        role = "aut")
 Maintainer: Casey McGrath <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Description: Calculate and create a single dataframe of the slope, 
+            mean, standard deviation, standard position, and slope 
+            range for a set of window widths for the SELECT model data.  
 License: BSD2-Clause
 Encoding: UTF-8
 LazyData: true
 Imports: 
-    fasterize
+    landsat
+    raster
+    zoo
+    dplyr
 Depends:
     R (>= 3.6.0)
 RoxygenNote: 7.1.1
