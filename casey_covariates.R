@@ -1,30 +1,26 @@
-#' Analysis tools for spatial model projection Covariates
-setwd("C:\\Users\\mcgr323\\projects\\select\\LandMask_1-8-degree_DATA")
-attribute_tble = import("tbl_inputToArcGIS_SSP5_2010.csv")
-centroid_shp = st_read(file.path(workspace_path,"LandMask_1-8-degree_fishnet_centroids.shp"))
-raster_benchmark = raster(file.path(workspace_path,"LandMask_1-8-degree_raster.img"))
-variable_arr <- c('newR', 'newD', 'newA')
-size_arr <- c(3,5,7,9)
-
-#' # create slope dataframe from rasters
-#' #' @param attribute_tble
-#' #' @param centroid_shp
-#' #' @param variable_arr
-#' #' @return output_slope
-#' #' @importFrom landsat slopeasp
-#' #' @importFrom raster raster
-#' #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
-#' #' @export
+#' Create slope dataframe for variable arrangment
+#'
+#' Calculate slope using landsat slopeasp function from SELECT model
+#' attribute table, then convert to raster and extract data at the centroids
+#'
+#' @param attribute_tble dataframe of raw data from select model
+#' @param centroid_shp centroid shapefile for CONUS
+#' @param variable_arr vector of variables listed in attribute table
+#' @return output_slope
+#' @importFrom landsat slopeasp
+#' @importFrom raster raster
+#' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
+#' @export
 raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
   #create empty slope dataframe to store output
   output_slope = data.frame(matrix(NA, nrow = nrow(attribute_tble), ncol = length(variable_arr)))
-  for (f in 1:length(variable_arr)){
+  for (i in seq_along(variable_arr)){
     #extract lat/long from the centroid shp
     coor = as.data.frame(st_coordinates(centroid_shp))
     x = coor$X
     y = coor$Y
     #get elevation from the attribute table
-    z = attribute_tble[,f]
+    z = attribute_tble[,i]
     #create matrix
     pts <- as.data.frame(matrix(c(x,y,z),  ncol=3,  byrow=FALSE))
     colnames(pts)=c("x", "y", "z")
@@ -38,12 +34,11 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
     #convert to raster
     r <- raster(slope$slope)
     #extract values from raster at centroids
-    output_slope[f] =as.data.frame(extract(r, centroid_shp))
+    output_slope[i] =as.data.frame(extract(r, centroid_shp))
   }
   #name the columns
   names(output_slope) = variable_arr
-  #change from degrees to percent slope
-  output_slope[output_slope > 45] <- NA #anything more than 45 is NA (45 deg = 100%)
+  #change from degrees to percent rise
   output_slope = (output_slope* pi/180)*100
   #NA to 0 to match python script
   slope_data[is.na(slope_data)] <- 0
@@ -51,11 +46,17 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
 }
 
 
-#' create dataframe of focal statistica from variable arrangement in attribute table
-#' @param attribute_tble
-#' @param putput_slope
-#' @param variable_arr
-#' @param size
+#' Calculate focal statistics for raw SELECT model data
+#'
+#' Calculate mean, std, std position and slope range from SELECT
+#' model attribute table for a single window width (parameter: "size")
+#'
+#' Function must be calculated for all window widths (3,5,7,9) to run combine_df
+#'
+#' @param attribute_tble dataframe of raw data from SELECT model
+#' @param output_slope dataframe of calculated slope from the raster_slope function
+#' @param variable_arr vector of variables listed in attribute table
+#' @param size moving window size for calculating focal statistics
 #' @return focal_data
 #' @importFrom zoo rollapply
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
@@ -86,9 +87,12 @@ focal_stats = function(attribute_tble, variable_arr, size) {
   return(focal_data)
 }
 
-#' join the grid center layer to attribute feature file
-#' @param centroid_shp
-#' @param attribute_tble
+#' Create a SpatialPointsDataFrame
+#'
+#' Join centroid shp to the attribute table
+#'
+#' @param centroid_shp centroid shapefile for CONUS
+#' @param attribute_tble dataframe of raw data from SELECT model
 #' @return  centroid_lyr
 #' @importFrom dplyr merge
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
@@ -98,15 +102,19 @@ spatial_join <- function(centroid_shp,attribute_tble) {
   return(centroid_lyr)
 }
 
-# create rasters from the centroid layer
-#' @param cent_lyr
-#' @param output_slope
-#' @param focal_3
-#' @param focal_5
-#' @param focal_7
-#' @param focal_9
+
+#' Create single dataframe of raw data, focal statistics and shapefile
+#'
+#' Bind the SpatialPointsDataFrame, slope and focal statistics for all window widths
+#' into a single dataframe and format column names
+#'
+#' @param cent_lyr the SpatialPointsDataFrame from the spatial_join function
+#' @param output_slope dataframe of calculated slope from the raster_slope function
+#' @param focal_3 dataframe of focal statistics for a window width of 3 from the focal_stats function
+#' @param focal_5 dataframe of focal statistics for a window width of 5 from the focal_stats function
+#' @param focal_7 dataframe of focal statistics for a window width of 7 from the focal_stats function
+#' @param focal_9 dataframe of focal statistics for a window width of 9 from the focal_stats function
 #' @return focal_data
-#' @importFrom dplyr cbind
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
 combine_df <- function(cent_lyr, output_slope, focal_3, focal_5, focal_7, focal_9, ){
@@ -136,5 +144,3 @@ combine_df <- function(cent_lyr, output_slope, focal_3, focal_5, focal_7, focal_
   focal_data = cbind(cent_lyr,output_slope, focal_stats)
   return(focal_data)
 }
-
-
