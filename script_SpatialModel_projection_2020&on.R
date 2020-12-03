@@ -28,7 +28,7 @@ colnames(estDF) <- c("originFID", "x")
 load("Model_GeneralTrend.RData")
 estDF$GT <- predict(GeneralTrendModel, estDF)
 rm(GeneralTrendModel)
-estDF <- subset(estDF, select=c(-x))
+estDF_20 <- subset(estDF, select=c(-x))
 
 ######################
 # Data Updates & PCA #
@@ -156,11 +156,11 @@ alloDF <- data.frame()
 TPppBUList <- read.csv("data_2000TPppBU.csv")
 for (CTRY in CtryList) {
   ctryEstDF <- subset(estDF, grepl(paste("^", CTRY, "$", sep=""), estDF$ISO))
-  
+
   sumAvailLnd <- sum(ctryEstDF$availLnd)
   ctryBUChg <- subset(NatDecBUAmtList, grepl(paste("^", CTRY, "$", sep=""), NatDecBUAmtList$ISO3v10))$BUAmtChg
   sumAmtD <- sum(ctryEstDF$amtD)
-  
+
   if (ctryBUChg == 0) {
     currAlloDF <- as.data.frame(ctryEstDF$originFID)
     colnames(currAlloDF) <- "originFID"
@@ -168,7 +168,7 @@ for (CTRY in CtryList) {
     currAlloDF$newD <- 0
     alloDF <- rbind(alloDF, currAlloDF)
     print(paste(CTRY, ": mode 0 (no change)", sep=""))
-    
+
   } else if (sumAvailLnd <= ctryBUChg) {
     currAlloDF <- as.data.frame(ctryEstDF$originFID)
     colnames(currAlloDF) <- "originFID"
@@ -177,7 +177,7 @@ for (CTRY in CtryList) {
     currAlloDF$newD <- ifelse(currAlloDF$newD < 0, 0, currAlloDF$newD) # in case of rounding error
     alloDF <- rbind(alloDF, currAlloDF)
     print(paste(CTRY, ": mode 1 (total overflows avail land)", sep=""))
-    
+
   } else { # sumAvailLnd > ctryBUChg
     tpidList <- as.vector(unique(ctryEstDF$TPID))
     tpidDistrDF <- as.data.frame(tapply(ctryEstDF$ppCntT2, ctryEstDF$TPID, sum))
@@ -189,12 +189,12 @@ for (CTRY in CtryList) {
     tpidDistrDF <- left_join(tpidDistrDF, TPppBUList, by = "TPID")
     detach("package:dplyr", unload=TRUE)
     tpidDistrDF$ppCntT2 <- tpidDistrDF$ppCntT2 / 1000000 * tpidDistrDF$ppBU00_m.2
-    
+
     sumT2Pop <- sum(tpidDistrDF$ppCntT2)
     tpidDistrDF$tpidBUChg <- ctryBUChg * tpidDistrDF$ppCntT2 / sumT2Pop
     tpidDistrDF$overflow <- tpidDistrDF$tpidBUChg - tpidDistrDF$availLnd
     sumTpidOverflow <- sum(tpidDistrDF$overflow[tpidDistrDF$overflow > 0])
-    
+
     while (sumTpidOverflow > 0) {
       sumT2Pop <- sum(tpidDistrDF$ppCntT2[tpidDistrDF$overflow < 0])
       tpidDistrDF$tpidBUChg <- ifelse(tpidDistrDF$overflow < 0,
@@ -204,23 +204,23 @@ for (CTRY in CtryList) {
       sumTpidOverflow <- sum(tpidDistrDF$overflow[tpidDistrDF$overflow > 0])
     }
     rm(sumT2Pop, sumTpidOverflow)
-    
+
     for (currTPID in tpidList) {
       tpidEstDF <- subset(ctryEstDF, grepl(paste("^", currTPID, "$", sep=""), ctryEstDF$TPID))
-      
+
       sumAvailLnd <- sum(tpidEstDF$availLnd)
       tpidBUChg <- subset(tpidDistrDF, grepl(paste("^", currTPID, "$", sep=""), tpidDistrDF$TPID))$tpidBUChg
       sumAmtD <- sum(tpidEstDF$amtD)
-      
+
       if (sumAmtD == 0) {
         sumRT1 <- sum(tpidEstDF$rT1)
         scaler <- tpidBUChg / sumRT1
         tpidEstDF$amtD <- tpidEstDF$rT1 * scaler
-        
+
         tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
         sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
         tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
-        
+
         while (sumOverflow > 0) {
           sumRT1 <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$rT1)
           scaler <- sumOverflow / sumRT1
@@ -229,7 +229,7 @@ for (CTRY in CtryList) {
           sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
           tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
         }
-        
+
         rm(scaler, sumOverflow)
         tpidEstDF$newD <- tpidEstDF$amtD / tpidEstDF$GrumpLndAr
         tpidEstDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
@@ -237,14 +237,14 @@ for (CTRY in CtryList) {
         tpidEstDF$newR <- pmin(tpidEstDF$newR, tpidEstDF$mask, na.rm = TRUE)
         tpidEstDF$newD <- tpidEstDF$newR - tpidEstDF$rT1
         tpidEstDF$newD <- ifelse(tpidEstDF$newD < 0, 0, tpidEstDF$newD) # in case of rounding error
-        
+
         currAlloDF <- as.data.frame(tpidEstDF$originFID)
         colnames(currAlloDF) <- "originFID"
         currAlloDF$newR <- tpidEstDF$newR
         currAlloDF$newD <- tpidEstDF$newD
         alloDF <- rbind(alloDF, currAlloDF)
         print(paste(currTPID, ": mode 2 (potential = 0, iteratively fill according to rT1)", sep=""))
-        
+
       } else if (sumAmtD >= tpidBUChg) {
         scaler <- tpidBUChg / sumAmtD
         tpidEstDF$newD <- tpidEstDF$newD * scaler
@@ -256,15 +256,15 @@ for (CTRY in CtryList) {
         currAlloDF$newD <- tpidEstDF$newD
         alloDF <- rbind(alloDF, currAlloDF)
         print(paste(currTPID, ": mode 3 (potential >= total, proportionally scale down)", sep=""))
-        
+
       } else { # sumAmtD < tpidBUChg
         scaler <- tpidBUChg / sumAmtD
         tpidEstDF$amtD <- tpidEstDF$amtD * scaler
-        
+
         tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
         sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
         tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
-        
+
         while (sumOverflow > 0) {
           sumAmtD <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$amtD)
           if (sumAmtD > 0) {
@@ -279,7 +279,7 @@ for (CTRY in CtryList) {
           sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
           tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
         }
-        
+
         rm(scaler, sumOverflow)
         tpidEstDF$newD <- tpidEstDF$amtD / tpidEstDF$GrumpLndAr
         tpidEstDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
@@ -287,7 +287,7 @@ for (CTRY in CtryList) {
         tpidEstDF$newR <- pmin(tpidEstDF$newR, tpidEstDF$mask, na.rm = TRUE)
         tpidEstDF$newD <- tpidEstDF$newR - tpidEstDF$rT1
         tpidEstDF$newD <- ifelse(tpidEstDF$newD < 0, 0, tpidEstDF$newD) # in case of rounding error
-        
+
         currAlloDF <- as.data.frame(tpidEstDF$originFID)
         colnames(currAlloDF) <- "originFID"
         currAlloDF$newR <- tpidEstDF$newR

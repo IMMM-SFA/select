@@ -1,6 +1,6 @@
 Package: select
 Type: Package
-Title: Derive focal statistics for SELECT model data
+Title: The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model package 
 Version: 0.1.0
 Author@R:c(person("Jing", "Gao", 
             email = "jinggao@udel.edu", 
@@ -11,20 +11,14 @@ Author@R:c(person("Jing", "Gao",
 	        person("Chris", "Vernon", 
 	        email = "chris.vernon@pnnl.gov", 
 	        role = "aut")
-Maintainer: Casey McGrath <yourself@somewhere.net>
-Description: Calculate and create a single dataframe of the slope, 
-            mean, standard deviation, standard position, and slope 
-            range for a set of window widths for the SELECT model data.  
+Maintainer: Casey McGrath <casey.mcgrath@pnnl.gov>
+Description: Package suporting model extraction and associated statistics for dataframes created for 
+             The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model
 License: BSD2-Clause
 Encoding: UTF-8
 LazyData: true
-Imports: 
-    landsat
-    raster
-    zoo
-    dplyr
 Depends:
-    R (>= 3.6.0)
+    R (>= 3.6.0),landsat, raster, zoo, dplyr, gam, mgcv, foreach, feather, tools, stats 
 RoxygenNote: 7.1.1
 VignetteBuilder: knitr
 Suggests:

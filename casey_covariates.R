@@ -41,7 +41,7 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
   #change from degrees to percent rise
   output_slope = (output_slope* pi/180)*100
   #NA to 0 to match python script
-  slope_data[is.na(slope_data)] <- 0
+  output_slope[is.na(output_slope)] <- 0
   return(output_slope)
 }
 

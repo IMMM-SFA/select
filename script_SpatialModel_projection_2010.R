@@ -9,86 +9,102 @@
 ######################
 ######################
 currSSP <- "SSP5"
-workspacePath <- "/Users/d3y010/projects/jing/data"
-
+workspacePath <- "C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select"
+trainingGrids <- read.csv("tbl_attr_1-8-dgr_training.csv"))
 ######################
 ######################
 
 ######################
 ### General Trends ###
 ######################
+#' @description Creates a data frame of general trends
+#' @param trainingGrids
+#' @param general_trend_model_file
+#' @return estDF
+#' @export
+general_trends <- function(trainingGrids,
+                           general_trend_model_file= "Model_GeneralTrend.RData") {
+  # use selected columns and rename them
+  estDF <- trainingGrids[,c(1, 46)]
+  colnames(estDF) <- c("originFID", "x")
+  # load GeneralTrendModel
+  load(general_trend_model_file)
+  # predict values based from the GeneralTrendModel for estDF
+  estDF$GT <- predict(GeneralTrendModel, estDF)
+  # remove x from the estDF dataframe
+  estDF <- subset(estDF, select=c(-x))
+  return(estDF)
+}
 
-trainingGrids <- read.csv(file.path(workspacePath, "tbl_attr_1-8-dgr_training.csv"))
+#TEST THE FUNCTION
+estDF <- general_trends(trainingGrids, general_trend_model_file= "Model_GeneralTrend.RData")
 
-estDF <- trainingGrids[,c(1, 46)]
-colnames(estDF) <- c("originFID", "x")
-
-load(file.path(workspacePath, "Model_GeneralTrend.RData"))
-estDF$GT <- predict(GeneralTrendModel, estDF)
-rm(GeneralTrendModel)
-estDF <- subset(estDF, select=c(-x))
 
 ######################
 # Data Updates & PCA #
 ######################
+#' @description Updates the data and create PCAs
+#' @param updateGrids
+#' @param estDF #dataframe created by general_trends()
+#' @param BUCovars #dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
+#' @param pcaModel #PCA model of BU data
+#' @param selectedFeatures
+#' @return estDF
+#' @export
+update_pca <- function(trainingGrids,
+                       estDF,
+                       pcaModel ="Model_BuPca.RData",
+                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
+                       maskGrids = "data_FinalMask.csv") {
+    #create dataframe of focal statistics
+  BUCovars <- trainingGrids[,10:117]
+  colnames(BUCovars) <- c("r80", "r80_slope", "r80_mean3", "r80_mean5", "r80_mean7", "r80_mean9", "r80_slrg3", "r80_slrg5", "r80_slrg7",
+                          "r80_slrg9", "r80_std3", "r80_std5", "r80_std7", "r80_std9", "r80_stps3", "r80_stps5", "r80_stps7", "r80_stps9",
+                          "r90", "r90_slope", "r90_mean3", "r90_mean5", "r90_mean7", "r90_mean9", "r90_slrg3", "r90_slrg5", "r90_slrg7",
+                          "r90_slrg9", "r90_std3", "r90_std5", "r90_std7", "r90_std9", "r90_stps3", "r90_stps5", "r90_stps7", "r90_stps9",
+                          "r00", "r00_slope", "r00_mean3", "r00_mean5", "r00_mean7", "r00_mean9", "r00_slrg3", "r00_slrg5", "r00_slrg7",
+                          "r00_slrg9", "r00_std3", "r00_std5", "r00_std7", "r00_std9", "r00_stps3", "r00_stps5", "r00_stps7", "r00_stps9",
+                          "d8090", "d8090slope", "d8090mean3", "d8090mean5", "d8090mean7", "d8090mean9", "d8090slrg3", "d8090slrg5",
+                          "d8090slrg7", "d8090slrg9", "d8090std3", "d8090std5", "d8090std7", "d8090std9", "d8090stps3", "d8090stps5",
+                          "d8090stps7", "d8090stps9", "d9000", "d9000slope", "d9000mean3", "d9000mean5", "d9000mean7", "d9000mean9",
+                          "d9000slrg3", "d9000slrg5", "d9000slrg7", "d9000slrg9", "d9000std3", "d9000std5", "d9000std7", "d9000std9",
+                          "d9000stps3", "d9000stps5", "d9000stps7", "d9000stps9", "a8000", "a8000slope", "a8000mean3", "a8000mean5",
+                          "a8000mean7", "a8000mean9", "a8000slrg3", "a8000slrg5", "a8000slrg7", "a8000slrg9", "a8000std3", "a8000std5",
+                          "a8000std7", "a8000std9", "a8000stps3", "a8000stps5", "a8000stps7", "a8000stps9")
+  #predicted values based from the pcaModel for BUCovars
+  load(pcaModel)
+  PCs <- predict(pcaModel, newdata = BUCovars)
+  #assign values to columns in estDF dataframe
+  estDF$rT1 <- BUCovars$r00
+  estDF$dT0T1 <- BUCovars$d9000
+  #bind orginFID to BUcovars dataframe
+  BUCovars <- cbind(estDF$originFID, BUCovars)
+  #rename the first column
+  colnames(BUCovars)[1] <- "originFID"
+  #save the file
+  save(BUCovars, file = "temp_tbl_attr_old.RData")
 
-BUCovars <- trainingGrids[,10:117]
-colnames(BUCovars) <- c("r80", "r80_slope", "r80_mean3", "r80_mean5", "r80_mean7", "r80_mean9", "r80_slrg3", "r80_slrg5", "r80_slrg7",
-                        "r80_slrg9", "r80_std3", "r80_std5", "r80_std7", "r80_std9", "r80_stps3", "r80_stps5", "r80_stps7", "r80_stps9",
-                        "r90", "r90_slope", "r90_mean3", "r90_mean5", "r90_mean7", "r90_mean9", "r90_slrg3", "r90_slrg5", "r90_slrg7",
-                        "r90_slrg9", "r90_std3", "r90_std5", "r90_std7", "r90_std9", "r90_stps3", "r90_stps5", "r90_stps7", "r90_stps9",
-                        "r00", "r00_slope", "r00_mean3", "r00_mean5", "r00_mean7", "r00_mean9", "r00_slrg3", "r00_slrg5", "r00_slrg7",
-                        "r00_slrg9", "r00_std3", "r00_std5", "r00_std7", "r00_std9", "r00_stps3", "r00_stps5", "r00_stps7", "r00_stps9",
-                        "d8090", "d8090slope", "d8090mean3", "d8090mean5", "d8090mean7", "d8090mean9", "d8090slrg3", "d8090slrg5",
-                        "d8090slrg7", "d8090slrg9", "d8090std3", "d8090std5", "d8090std7", "d8090std9", "d8090stps3", "d8090stps5",
-                        "d8090stps7", "d8090stps9", "d9000", "d9000slope", "d9000mean3", "d9000mean5", "d9000mean7", "d9000mean9",
-                        "d9000slrg3", "d9000slrg5", "d9000slrg7", "d9000slrg9", "d9000std3", "d9000std5", "d9000std7", "d9000std9",
-                        "d9000stps3", "d9000stps5", "d9000stps7", "d9000stps9", "a8000", "a8000slope", "a8000mean3", "a8000mean5",
-                        "a8000mean7", "a8000mean9", "a8000slrg3", "a8000slrg5", "a8000slrg7", "a8000slrg9", "a8000std3", "a8000std5",
-                        "a8000std7", "a8000std9", "a8000stps3", "a8000stps5", "a8000stps7", "a8000stps9")
+  estDF$GrumpLndAr <- trainingGrids$GrumpLndAr
+  maskGrids <- read.csv(maskGrids)
+  estDF$mask <- maskGrids$FinalMask
+  estDF$ISO <- trainingGrids$ISO
+  estDF$TPID <- trainingGrids$TPID
 
-load(file.path(workspacePath, "Model_BuPca.RData"))
-PCs <- predict(pcaModel, newdata = BUCovars)
-class(pcaModel)
-class(BUCovars)
-rm(pcaModel)
+  popGrids2000 <- read.csv( "data_2000TotalPop_SSPBaseYr.csv")
+  popGridsSSP <- read.csv(paste0("data_", currSSP, "TotalPopSeries.csv"))
 
-estDF$rT1 <- BUCovars$r00
-estDF$dT0T1 <- BUCovars$d9000
-BUCovars <- cbind(estDF$originFID, BUCovars)
-colnames(BUCovars)[1] <- "originFID"
-save(BUCovars, file = "temp_tbl_attr_old.RData")
-rm(BUCovars)
+  print(class(popGridsSSP))
+  print(class(trainingGrids))
+  print(class(popGridsSSP[,2]))
 
-estDF$GrumpLndAr <- trainingGrids$GrumpLndAr
-maskGrids <- read.csv(file.path(workspacePath, "data_FinalMask.csv"))
-estDF$mask <- maskGrids$FinalMask
-rm(maskGrids)
-estDF$ISO <- trainingGrids$ISO
-estDF$TPID <- trainingGrids$TPID
+  trainingGrids$ppCnt10 <- popGridsSSP[,2]
+  trainingGrids$DppC00_10 <- popGridsSSP[,2] - popGrids2000[,2]
+  trainingGrids$CRppC00_10 <- trainingGrids$DppC00_10 / popGrids2000[,2]
+  trainingGrids$CRppC00_10 <- replace(trainingGrids$CRppC00_10, !is.finite(trainingGrids$CRppC00_10), 0)
+  estDF$ppCntT2 <- trainingGrids$ppCnt10
 
-popGrids2000 <- read.csv(file.path(workspacePath, "data_2000TotalPop_SSPBaseYr.csv"))
-popGridsSSP <- read.csv(file.path(workspacePath, paste0("data_", currSSP, "TotalPopSeries.csv")))
-
-print(class(popGridsSSP))
-print(class(trainingGrids))
-print(class(popGridsSSP[,2]))
-
-trainingGrids$ppCnt10 <- popGridsSSP[,2]
-trainingGrids$DppC00_10 <- popGridsSSP[,2] - popGrids2000[,2]
-trainingGrids$CRppC00_10 <- trainingGrids$DppC00_10 / popGrids2000[,2]
-trainingGrids$CRppC00_10 <- replace(trainingGrids$CRppC00_10, !is.finite(trainingGrids$CRppC00_10), 0)
-estDF$ppCntT2 <- trainingGrids$ppCnt10
-rm(popGrids2000, popGridsSSP)
-
-selectedFeatures <- cbind(trainingGrids[,1:9], PCs[,1:15], trainingGrids[,119:121])
-rm(trainingGrids, PCs)
-save(selectedFeatures, file = "temp_SelectedFeatures_projection.RData")
-
-
-class(selectedFeatures)
-colnames(selectedFeatures)
-dim(selectedFeatures)
+  selectedFeatures <- cbind(trainingGrids[,1:9], PCs[,1:15], trainingGrids[,119:121])
+  save(selectedFeatures, file = "temp_SelectedFeatures_projection.RData")
 
 ######################
 ######## GAMs ########
@@ -106,9 +122,9 @@ for (CTRY in ISO3ExceptList) {
   load(paste(workspacePath, "/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
   isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
   tpidList <- as.vector(unique(isoInGAM$TPID))
-  
-  
-  
+
+
+
   # for (currTpid in tpidList) {
   #   inGAM <- subset(isoInGAM, grepl(paste("^", currTpid, "$", sep=""), isoInGAM$TPID))
   #   currDF <- as.data.frame(inGAM$originFID)
@@ -177,11 +193,11 @@ alloDF <- data.frame()
 TPppBUList <- read.csv("data_2000TPppBU.csv")
 for (CTRY in CtryList) {
   ctryEstDF <- subset(estDF, grepl(paste("^", CTRY, "$", sep=""), estDF$ISO))
-  
+
   sumAvailLnd <- sum(ctryEstDF$availLnd)
   ctryBUChg <- subset(NatDecBUAmtList, grepl(paste("^", CTRY, "$", sep=""), NatDecBUAmtList$ISO3v10))$BUAmtChg
   sumAmtD <- sum(ctryEstDF$amtD)
-  
+
   if (ctryBUChg == 0) {
     currAlloDF <- as.data.frame(ctryEstDF$originFID)
     colnames(currAlloDF) <- "originFID"
@@ -189,7 +205,7 @@ for (CTRY in CtryList) {
     currAlloDF$newD <- 0
     alloDF <- rbind(alloDF, currAlloDF)
     print(paste(CTRY, ": mode 0 (no change)", sep=""))
-    
+
   } else if (sumAvailLnd <= ctryBUChg) {
     currAlloDF <- as.data.frame(ctryEstDF$originFID)
     colnames(currAlloDF) <- "originFID"
@@ -198,7 +214,7 @@ for (CTRY in CtryList) {
     currAlloDF$newD <- ifelse(currAlloDF$newD < 0, 0, currAlloDF$newD) # in case of rounding error
     alloDF <- rbind(alloDF, currAlloDF)
     print(paste(CTRY, ": mode 1 (total overflows avail land)", sep=""))
-    
+
   } else { # sumAvailLnd > ctryBUChg
     tpidList <- as.vector(unique(ctryEstDF$TPID))
     tpidDistrDF <- as.data.frame(tapply(ctryEstDF$ppCntT2, ctryEstDF$TPID, sum))
@@ -210,12 +226,12 @@ for (CTRY in CtryList) {
     tpidDistrDF <- left_join(tpidDistrDF, TPppBUList, by = "TPID")
     detach("package:dplyr", unload=TRUE)
     tpidDistrDF$ppCntT2 <- tpidDistrDF$ppCntT2 / 1000000 * tpidDistrDF$ppBU00_m.2
-    
+
     sumT2Pop <- sum(tpidDistrDF$ppCntT2)
     tpidDistrDF$tpidBUChg <- ctryBUChg * tpidDistrDF$ppCntT2 / sumT2Pop
     tpidDistrDF$overflow <- tpidDistrDF$tpidBUChg - tpidDistrDF$availLnd
     sumTpidOverflow <- sum(tpidDistrDF$overflow[tpidDistrDF$overflow > 0])
-    
+
     while (sumTpidOverflow > 0) {
       sumT2Pop <- sum(tpidDistrDF$ppCntT2[tpidDistrDF$overflow < 0])
       tpidDistrDF$tpidBUChg <- ifelse(tpidDistrDF$overflow < 0,
@@ -225,23 +241,23 @@ for (CTRY in CtryList) {
       sumTpidOverflow <- sum(tpidDistrDF$overflow[tpidDistrDF$overflow > 0])
     }
     rm(sumT2Pop, sumTpidOverflow)
-    
+
     for (currTPID in tpidList) {
       tpidEstDF <- subset(ctryEstDF, grepl(paste("^", currTPID, "$", sep=""), ctryEstDF$TPID))
-      
+
       sumAvailLnd <- sum(tpidEstDF$availLnd)
       tpidBUChg <- subset(tpidDistrDF, grepl(paste("^", currTPID, "$", sep=""), tpidDistrDF$TPID))$tpidBUChg
       sumAmtD <- sum(tpidEstDF$amtD)
-      
+
       if (sumAmtD == 0) {
         sumRT1 <- sum(tpidEstDF$rT1)
         scaler <- tpidBUChg / sumRT1
         tpidEstDF$amtD <- tpidEstDF$rT1 * scaler
-        
+
         tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
         sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
         tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
-        
+
         while (sumOverflow > 0) {
           sumRT1 <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$rT1)
           scaler <- sumOverflow / sumRT1
@@ -250,7 +266,7 @@ for (CTRY in CtryList) {
           sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
           tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
         }
-        
+
         rm(scaler, sumOverflow)
         tpidEstDF$newD <- tpidEstDF$amtD / tpidEstDF$GrumpLndAr
         tpidEstDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
@@ -258,14 +274,14 @@ for (CTRY in CtryList) {
         tpidEstDF$newR <- pmin(tpidEstDF$newR, tpidEstDF$mask, na.rm = TRUE)
         tpidEstDF$newD <- tpidEstDF$newR - tpidEstDF$rT1
         tpidEstDF$newD <- ifelse(tpidEstDF$newD < 0, 0, tpidEstDF$newD) # in case of rounding error
-        
+
         currAlloDF <- as.data.frame(tpidEstDF$originFID)
         colnames(currAlloDF) <- "originFID"
         currAlloDF$newR <- tpidEstDF$newR
         currAlloDF$newD <- tpidEstDF$newD
         alloDF <- rbind(alloDF, currAlloDF)
         print(paste(currTPID, ": mode 2 (potential = 0, iteratively fill according to rT1)", sep=""))
-        
+
       } else if (sumAmtD >= tpidBUChg) {
         scaler <- tpidBUChg / sumAmtD
         tpidEstDF$newD <- tpidEstDF$newD * scaler
@@ -277,15 +293,15 @@ for (CTRY in CtryList) {
         currAlloDF$newD <- tpidEstDF$newD
         alloDF <- rbind(alloDF, currAlloDF)
         print(paste(currTPID, ": mode 3 (potential >= total, proportionally scale down)", sep=""))
-        
+
       } else { # sumAmtD < tpidBUChg
         scaler <- tpidBUChg / sumAmtD
         tpidEstDF$amtD <- tpidEstDF$amtD * scaler
-        
+
         tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
         sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
         tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
-        
+
         while (sumOverflow > 0) {
           sumAmtD <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$amtD)
           if (sumAmtD > 0) {
@@ -300,7 +316,7 @@ for (CTRY in CtryList) {
           sumOverflow <- sum(tpidEstDF[tpidEstDF$overflow > 0, ]$overflow)
           tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, tpidEstDF$amtD, tpidEstDF$availLnd)
         }
-        
+
         rm(scaler, sumOverflow)
         tpidEstDF$newD <- tpidEstDF$amtD / tpidEstDF$GrumpLndAr
         tpidEstDF$newR <- tpidEstDF$rT1 + tpidEstDF$newD
@@ -308,7 +324,7 @@ for (CTRY in CtryList) {
         tpidEstDF$newR <- pmin(tpidEstDF$newR, tpidEstDF$mask, na.rm = TRUE)
         tpidEstDF$newD <- tpidEstDF$newR - tpidEstDF$rT1
         tpidEstDF$newD <- ifelse(tpidEstDF$newD < 0, 0, tpidEstDF$newD) # in case of rounding error
-        
+
         currAlloDF <- as.data.frame(tpidEstDF$originFID)
         colnames(currAlloDF) <- "originFID"
         currAlloDF$newR <- tpidEstDF$newR

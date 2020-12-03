@@ -1,48 +1,11 @@
-import arcpy
-arcpy.env.workspace = "C:/Users/mcgr323/projects/select"
-arcpy.env.overwriteOutput = True
-
-####################
-# in Excel, check the .csv file, remove the first empty column
-# in ArcGIS, MANUALLY export .csv to .dbf (~1 min), BE CAREFUL to specify DOUBLE as the data type for
-# the three data columns, which are frequently defaulted as LONG by Arc, the output file should be ~65MB
-####################
-
-attrTblFile = "C:/Users/mcgr323/projects/select/LandMask_1-8-degree_DATA/tbl_inputToArcGIS_SSP5_2010.csv"
-gridCntrFile = "C:/Users/mcgr323/projects/select/LandMask_1-8-degree_DATA/LandMask_1-8-degree_fishnet_centroids.shp"
-rasterBenchmarkFile = "C:/Users/mcgr323/projects/select/LandMask_1-8-degree_DATA/LandMask_1-8-degree_raster.img"
-
-# set geoprocessing environment parameters to comply with raster benchmark file:
-#   output coordinates, snap raster, raster analysis - cell size, raster storage - LZW compression
-arcpy.env.outputCoordinateSystem = rasterBenchmarkFile
-arcpy.env.snapRaster = rasterBenchmarkFile
-arcpy.env.cellSize = rasterBenchmarkFile
-arcpy.env.compression = 'LZW'
-
-fileNameArr = ["newR", "newD", "newA"]
-sizeArr = [3, 5, 7, 9]
-
-arcpy.AddMessage("start raster conversion")
-# join attr table to grid center feature file
-# arcpy.MakeFeatureLayer_management(gridCntrFile, "gridCntrLayer")
-
-# #  AddJoin(in_layer_or_view, in_field, join_table, join_field, {join_type})
-# gridCntrLyr = arcpy.AddJoin_management("gridCntrLayer", "originFID", attrTblFile, "originFID", "KEEP_ALL")
-# fx = "C:/Users/mcgr323/projects/select/test.shp"
-# arcpy.CopyFeatures_management(gridCntrLyr, fx)
-
-# file from Chris
-gridCntrLyr = "C:/Users/mcgr323/projects/select/to_casey/grid_center_layer.shp"
-
-flds = [i.name for i in arcpy.ListFields(gridCntrLyr)]
+flds = [i.name for i in arcpy.ListFields("gridCntrLayer")]
 print(flds)
 
 # convert attributes to rasters, using iterations (~2 min per raster)
 for outName in fileNameArr:
     arcpy.AddMessage("start raster conversion: "+outName)
-    arcpy.PointToRaster_conversion(gridCntrLyr, outName, outName, "MEAN")
+    arcpy.PointToRaster_conversion(gridCntrLyr, "tbl_inputToArcGIS_SSP5_2010.csv."+outName, outName, "MEAN")
     arcpy.AddMessage("complete raster conversion: "+outName)
-
 
 # load necesary tools
 arcpy.CheckOutExtension("spatial")
