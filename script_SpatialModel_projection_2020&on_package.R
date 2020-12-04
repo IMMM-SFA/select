@@ -1,31 +1,35 @@
-
-###### for 2010 ######
-
+<<<<<<< HEAD
+###### for 2020 and onward ######
 ## NOTE of CAUTION:
 ## be careful with .csv files, where Excell may interpret TPID "MAR*" as dates
 ## work-around: 1) copy column from source data (e.g. dbf file), 2) specify column type (in Excel), 3) save
 ##              (this may need to be done everytime the file needs to be saved in Excel)
+
+######################
+####SET PARAMETERS####
+######################
+
 setwd("C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select")
-######################
-######################
-currSSP <- "SSP5"
 workspacePath <- "C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select"
-trainingGrids <- read.csv("tbl_attr_1-8-dgr_training.csv")
-######################
-######################
+# 3 for 2020, +1 per later decade, 11 for 2100;
+# differently, for National BUAmts, this is the column ID for the beginning of the decade, i.e. 3 for 2010
+endPopColID <- 6
+currSSP <- "SSP1"
+# make sure temp_tbl_attr_updates.csv is sorted on originFID (low to high)
+updateGrids <-read.csv("temp_tbl_attr_updates.csv")
 
 ######################
 ### General Trends ###
 ######################
 #' @description Creates a data frame of general trends
-#' @param trainingGrids data.frame; First nine fields in training data.
+#' @param updateGrids
 #' @param general_trend_model_file
 #' @return estDF
 #' @export
-general_trends <- function(trainingGrids,
+general_trends <- function(updateGrids,
                            general_trend_model_file= "Model_GeneralTrend.RData") {
   # use selected columns and rename them
-  estDF <- trainingGrids[,c(1, 46)]
+  estDF <- updateGrids[,1:2]
   colnames(estDF) <- c("originFID", "x")
   # load GeneralTrendModel
   load(general_trend_model_file)
@@ -37,29 +41,30 @@ general_trends <- function(trainingGrids,
 }
 
 #TEST THE FUNCTION
-estDF_package <- general_trends(trainingGrids, general_trend_model_file= "Model_GeneralTrend.RData")
-all.equal(estDF_package,estDF) #TRUE
+estDF <- general_trends(updateGrids, general_trend_model_file= "Model_GeneralTrend.RData")
+all.equal(estDF_package_20,estDF_20) #TRUE
 
 ######################
-# Data Updates & PCA #
+##Data Updates & PCA##
 ######################
 #' @description Updates the data and create PCAs
 #' @param updateGrids
-#' @param estDF dataframe created by general_trends()
-#' @param BUCovars dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
-#' @param pcaModel PCA model of BU data
-#' @param selectedFeatures slected features of model outputs
-#' @importFrom stats predict
+#' @param estDF #dataframe created by general_trends()
+#' @param BUCovars #dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
+#' @param pcaModel #PCA model of BU data
+#' @param selectedFeatures selected features of model outputs
+#' @importFrom car predict
 #' @return list; extracted components from update Grids data => list(bu_covars, selectedFeatures)
 #' @export
-update_pca <- function(trainingGrids,
+update_pca <- function(updateGrids,
                        estDF,
+                       BUCovars = "temp_tbl_attr_old.RData",
                        pcaModel ="Model_BuPca.RData",
-                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
-                       maskGrids = "data_FinalMask.csv",
-                       popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv") {
-    #create dataframe of focal statistics
-  BUCovars <- trainingGrids[,10:117]
+                       selectedFeatures = "temp_SelectedFeatures_projection.RData") {
+  #create dataframe of focal statistics
+  load(BUCovars)
+  oldGrids <- BUCovars
+  BUCovars <- cbind(oldGrids[,20:55], updateGrids[,2:19], oldGrids[,74:91], updateGrids[,20:55])
   colnames(BUCovars) <- c("r80", "r80_slope", "r80_mean3", "r80_mean5", "r80_mean7", "r80_mean9", "r80_slrg3", "r80_slrg5", "r80_slrg7",
                           "r80_slrg9", "r80_std3", "r80_std5", "r80_std7", "r80_std9", "r80_stps3", "r80_stps5", "r80_stps7", "r80_stps9",
                           "r90", "r90_slope", "r90_mean3", "r90_mean5", "r90_mean7", "r90_mean9", "r90_slrg3", "r90_slrg5", "r90_slrg7",
@@ -79,48 +84,42 @@ update_pca <- function(trainingGrids,
   #assign values to columns in estDF dataframe
   estDF$rT1 <- BUCovars$r00
   estDF$dT0T1 <- BUCovars$d9000
+
   #bind orginFID to BUcovars dataframe
   BUCovars <- cbind(estDF$originFID, BUCovars)
-  #rename the first column
   colnames(BUCovars)[1] <- "originFID"
-  #save the file
+  #save the new BUCovars as RData output
   save(BUCovars, file = "temp_tbl_attr_old.RData")
+  #load the popGrids file for the current SSP
+  popGrids <- read.csv(paste0("data_", currSSP, "TotalPopSeries.csv"))
 
-  #add new columns to estDF from trainingGrids and maskGrids
-  estDF$GrumpLndAr <- trainingGrids$GrumpLndAr
-  maskGrids <- read.csv(maskGrids)
-  estDF$mask <- maskGrids$FinalMask
-  estDF$ISO <- trainingGrids$ISO
-  estDF$TPID <- trainingGrids$TPID
-
-  #load popGrids2000
-  popGrids2000 <- read.csv(popGrids2000)
-  popGridsSSP <- read.csv(paste0("data_", currSSP, "TotalPopSeries.csv"))
+  #add new columns to estDF from selectedFeatures
+  load(selectedFeatures)
+  estDF$GrumpLndAr <- selectedFeatures$GrumpLndAr
+  estDF$mask <- selectedFeatures$mask
+  estDF$ISO <- selectedFeatures$ISO
+  estDF$TPID <- selectedFeatures$TPID
 
   #TODO: what is this calculating?
-  trainingGrids$ppCnt10 <- popGridsSSP[,2]
-  trainingGrids$DppC00_10 <- popGridsSSP[,2] - popGrids2000[,2]
-  trainingGrids$CRppC00_10 <- trainingGrids$DppC00_10 / popGrids2000[,2]
-  trainingGrids$CRppC00_10 <- replace(trainingGrids$CRppC00_10, !is.finite(trainingGrids$CRppC00_10), 0)
-  estDF$ppCntT2 <- trainingGrids$ppCnt10
+  selectedFeatures$ppCnt10 <- popGrids[,endPopColID]
+  selectedFeatures$DppC00_10 <- popGrids[,endPopColID] - popGrids[,(endPopColID-1)]
+  selectedFeatures$CRppC00_10 <- selectedFeatures$DppC00_10 / popGrids[,(endPopColID-1)]
+  selectedFeatures$CRppC00_10 <- replace(selectedFeatures$CRppC00_10, !is.finite(selectedFeatures$CRppC00_10), 0)
+  estDF$ppCntT2 <- selectedFeatures$ppCnt10
 
   #create new selectedFeatures dataframe and save
-  selectedFeatures <- cbind(trainingGrids[,1:9], PCs[,1:15], trainingGrids[,119:121])
+  selectedFeatures <- cbind(selectedFeatures[,1:9], PCs[,1:15], selectedFeatures[,25:27])
   save(selectedFeatures, file = "temp_SelectedFeatures_projection.RData")
   return(list("bu_covars" = BUCovars,
               "selectedFeatures" = selectedFeatures))
 }
 
 #TEST THE FUNCTION
-list_2 <- update_pca(trainingGrids,
-                       estDF_package,
-                       pcaModel ="Model_BuPca.RData",
-                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
-                       maskGrids = "data_FinalMask.csv",
-                       popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv")
+list_2_20 <- update_pca (updateGrids,estDF,BUCovars = "temp_tbl_attr_old.RData",
+                     pcaModel ="Model_BuPca.RData",selectedFeatures = "temp_SelectedFeatures_projection.RData")
 
-all.equal(list_2$bu_covars, BUCovars) #TRUE
-all.equal(list_2$selectedFeatures, selectedFeatures) #TRUE
+all.equal(list_2_20$bu_covars, BUCovars)
+all.equal(list_2_20$selectedFeatures, selectedFeatures)
 
 ######################
 ######## GAMs ########
@@ -138,11 +137,10 @@ all.equal(list_2$selectedFeatures, selectedFeatures) #TRUE
 #' @return list; extracted components from update Grids data => list(estDF, alloDF)
 #' @export
 gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
-                          selectedFeatures= "temp_SelectedFeatures_projection.RData",
-                          ISO3List ="ISO3s.csv",
-                          estDF,
-                          TPppBUList = "data_2000TPppBU.csv") {
-
+                selectedFeatures= "temp_SelectedFeatures_projection.RData",
+                ISO3List ="ISO3s.csv",
+                estDF,
+                TPppBUList = "data_2000TPppBU.csv") {
   #create an empty dataframe
   LD_DF <- data.frame()
   #load the ISO3ExceptList and convert to vector
@@ -151,11 +149,22 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
 
   #for each CTRY in ISO3Expect list load the GAM model
   for (CTRY in ISO3ExceptList) {
-    load(paste(workspacePath, "/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
+    load(paste(workspacePath, "Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
     #create dataframe of selectedFeatures TPID subset by CTRY
     isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
     #create vector of unique TPID in isoInGAM
     tpidList <- as.vector(unique(isoInGAM$TPID))
+
+    for (currTpid in tpidList) {
+      inGAM <- subset(isoInGAM, grepl(paste("^", currTpid, "$", sep=""), isoInGAM$TPID))
+      #create dataframe of originFID
+      currDF <- as.data.frame(inGAM$originFID)
+      #add model predictions for list of models
+      currDF$LD <- predict(modelList[[currTpid]], inGAM)
+      #create new dataframe
+      LD_DF <- rbind(LD_DF, currDF)
+      print(paste(currTpid, ": ", dim(LD_DF), sep=""))
+    }
   }
 
   #load the ISO3 list and convert to vector
@@ -164,7 +173,7 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
 
   #for each CTRY in ISO3Expect list load the GAM model
   for (CTRY in ISO3List) {
-    load(paste(workspacePath, "/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
+    load(paste(workspacePath, "Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
     #create dataframe of selectedFeatures TPID subset by CTRY
     isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
     #create vector of unique TPID in isoInGAM
@@ -206,9 +215,8 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
   #load file for current SSP
   NatDecBUAmtList <- read.csv(paste0("data_NationalBUAmts_", currSSP, ".csv"))
   #TODO create new column (specfically?)
-  NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,3] - NatDecBUAmtList[,2]
+  NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,(endPopColID+1)] - NatDecBUAmtList[,endPopColID]
 
-  # "NATIONAL" total amount control: update newR, newD
   #create vector of unique countries
   CtryList <- as.vector(unique(estDF$ISO))
   #create empty dataframe
@@ -370,49 +378,49 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
 
   #TODO: what is being calculated
   alloDF$newA <- alloDF$newD - estDF$dT0T1
+  year <- 2000 + (endPopColID - 1) * 10
   #write alloDF csv
-  write.csv(alloDF, file = paste0("tbl_inputToArcGIS_", currSSP, "_2010.csv"))
+  write.csv(alloDF, file = paste0("tbl_inputToArcGIS_", currSSP, "_", year, ".csv"))
 
-  return(list("est_df" = est_df,
+  return(list("estDF" = estDF,
               "alloDF" = alloDF))
 }
-
 #TEST THE FUNCTION
 list_3 <- gam_dataframe(ISO3ExceptList = "ISO3s_exceptions.csv",
-               selectedFeatures= "temp_SelectedFeatures_projection.RData",
-               ISO3List ="ISO3s.csv",
-               estDF,
-               TPppBUList = "data_2000TPppBU.csv")
-
+              selectedFeatures= "temp_SelectedFeatures_projection.RData",
+              ISO3List ="ISO3s.csv",estDF,TPppBUList = "data_2000TPppBU.csv")
 =======
-
-###### for 2010 ######
-
+###### for 2020 and onward ######
 ## NOTE of CAUTION:
 ## be careful with .csv files, where Excell may interpret TPID "MAR*" as dates
 ## work-around: 1) copy column from source data (e.g. dbf file), 2) specify column type (in Excel), 3) save
 ##              (this may need to be done everytime the file needs to be saved in Excel)
 
 ######################
+####SET PARAMETERS####
 ######################
-currSSP <- "SSP5"
+
+setwd("C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select")
 workspacePath <- "C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select"
-trainingGrids <- read.csv("tbl_attr_1-8-dgr_training.csv"))
-######################
-######################
+# 3 for 2020, +1 per later decade, 11 for 2100;
+# differently, for National BUAmts, this is the column ID for the beginning of the decade, i.e. 3 for 2010
+endPopColID <- 6
+currSSP <- "SSP1"
+# make sure temp_tbl_attr_updates.csv is sorted on originFID (low to high)
+updateGrids <-read.csv("temp_tbl_attr_updates.csv")
 
 ######################
 ### General Trends ###
 ######################
 #' @description Creates a data frame of general trends
-#' @param trainingGrids
+#' @param updateGrids
 #' @param general_trend_model_file
 #' @return estDF
 #' @export
-general_trends <- function(trainingGrids,
+general_trends <- function(updateGrids,
                            general_trend_model_file= "Model_GeneralTrend.RData") {
   # use selected columns and rename them
-  estDF <- trainingGrids[,c(1, 46)]
+  estDF <- updateGrids[,1:2]
   colnames(estDF) <- c("originFID", "x")
   # load GeneralTrendModel
   load(general_trend_model_file)
@@ -424,29 +432,29 @@ general_trends <- function(trainingGrids,
 }
 
 #TEST THE FUNCTION
-estDF <- general_trends(trainingGrids, general_trend_model_file= "Model_GeneralTrend.RData")
-
+estDF <- general_trends(updateGrids, general_trend_model_file= "Model_GeneralTrend.RData")
 
 ######################
-# Data Updates & PCA #
+##Data Updates & PCA##
 ######################
 #' @description Updates the data and create PCAs
 #' @param updateGrids
-#' @param estDF dataframe created by general_trends()
-#' @param BUCovars dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
-#' @param pcaModel PCA model of BU data
-#' @param selectedFeatures slected features of model outputs
+#' @param estDF #dataframe created by general_trends()
+#' @param BUCovars #dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
+#' @param pcaModel #PCA model of BU data
+#' @param selectedFeatures selected features of model outputs
 #' @importFrom car predict
 #' @return estDF
 #' @export
-update_pca <- function(trainingGrids,
+update_pca <- function(updateGrids,
                        estDF,
+                       BUCovars = "temp_tbl_attr_old.RData",
                        pcaModel ="Model_BuPca.RData",
-                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
-                       maskGrids = "data_FinalMask.csv",
-                       popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv") {
-    #create dataframe of focal statistics
-  BUCovars <- trainingGrids[,10:117]
+                       selectedFeatures = "temp_SelectedFeatures_projection.RData") {
+  #create dataframe of focal statistics
+  load(BUCovars)
+  oldGrids <- BUCovars
+  BUCovars <- cbind(oldGrids[,20:55], updateGrids[,2:19], oldGrids[,74:91], updateGrids[,20:55])
   colnames(BUCovars) <- c("r80", "r80_slope", "r80_mean3", "r80_mean5", "r80_mean7", "r80_mean9", "r80_slrg3", "r80_slrg5", "r80_slrg7",
                           "r80_slrg9", "r80_std3", "r80_std5", "r80_std7", "r80_std9", "r80_stps3", "r80_stps5", "r80_stps7", "r80_stps9",
                           "r90", "r90_slope", "r90_mean3", "r90_mean5", "r90_mean7", "r90_mean9", "r90_slrg3", "r90_slrg5", "r90_slrg7",
@@ -462,49 +470,43 @@ update_pca <- function(trainingGrids,
                           "a8000std7", "a8000std9", "a8000stps3", "a8000stps5", "a8000stps7", "a8000stps9")
   #predicted values based from the pcaModel for BUCovars
   load(pcaModel)
-  ##########ISSUE#############################
   PCs <- predict(pcaModel, newdata = BUCovars)
   #assign values to columns in estDF dataframe
   estDF$rT1 <- BUCovars$r00
   estDF$dT0T1 <- BUCovars$d9000
+
   #bind orginFID to BUcovars dataframe
   BUCovars <- cbind(estDF$originFID, BUCovars)
-  #rename the first column
   colnames(BUCovars)[1] <- "originFID"
-  #save the file
+  #save the new BUCovars as RData output
   save(BUCovars, file = "temp_tbl_attr_old.RData")
+  #load the popGrids file for the current SSP
+  popGrids <- read.csv(paste0("data_", currSSP, "TotalPopSeries.csv"))
 
-  #add new columns to estDF from trainingGrids and maskGrids
-  estDF$GrumpLndAr <- trainingGrids$GrumpLndAr
-  maskGrids <- read.csv(maskGrids)
-  estDF$mask <- maskGrids$FinalMask
-  estDF$ISO <- trainingGrids$ISO
-  estDF$TPID <- trainingGrids$TPID
-
-  #load popGrids2000
-  popGrids2000 <- read.csv(popGrids2000)
-  popGridsSSP <- read.csv(paste0("data_", currSSP, "TotalPopSeries.csv"))
+  #add new columns to estDF from selectedFeatures
+  load(selectedFeatures)
+  estDF$GrumpLndAr <- selectedFeatures$GrumpLndAr
+  estDF$mask <- selectedFeatures$mask
+  estDF$ISO <- selectedFeatures$ISO
+  estDF$TPID <- selectedFeatures$TPID
 
   #TODO: what is this calculating?
-  trainingGrids$ppCnt10 <- popGridsSSP[,2]
-  trainingGrids$DppC00_10 <- popGridsSSP[,2] - popGrids2000[,2]
-  trainingGrids$CRppC00_10 <- trainingGrids$DppC00_10 / popGrids2000[,2]
-  trainingGrids$CRppC00_10 <- replace(trainingGrids$CRppC00_10, !is.finite(trainingGrids$CRppC00_10), 0)
-  estDF$ppCntT2 <- trainingGrids$ppCnt10
+  selectedFeatures$ppCnt10 <- popGrids[,endPopColID]
+  selectedFeatures$DppC00_10 <- popGrids[,endPopColID] - popGrids[,(endPopColID-1)]
+  selectedFeatures$CRppC00_10 <- selectedFeatures$DppC00_10 / popGrids[,(endPopColID-1)]
+  selectedFeatures$CRppC00_10 <- replace(selectedFeatures$CRppC00_10, !is.finite(selectedFeatures$CRppC00_10), 0)
+  estDF$ppCntT2 <- selectedFeatures$ppCnt10
 
   #create new selectedFeatures dataframe and save
-  selectedFeatures <- cbind(trainingGrids[,1:9], PCs[,1:15], trainingGrids[,119:121])
+  selectedFeatures <- cbind(selectedFeatures[,1:9], PCs[,1:15], selectedFeatures[,25:27])
   save(selectedFeatures, file = "temp_SelectedFeatures_projection.RData")
   return(estDF)
 }
 
 #TEST THE FUNCTION
-estDF_2 <- update_pca(trainingGrids,
-                       estDF,
-                       pcaModel ="Model_BuPca.RData",
-                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
-                       maskGrids = "data_FinalMask.csv",
-                       popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv")
+estDF_2 <- update_pca (updateGrids,estDF,BUCovars = "temp_tbl_attr_old.RData",
+                     pcaModel ="Model_BuPca.RData",selectedFeatures = "temp_SelectedFeatures_projection.RData")
+
 ######################
 ######## GAMs ########
 ######################
@@ -520,10 +522,10 @@ estDF_2 <- update_pca(trainingGrids,
 #' @importFrom mgcv gam
 #' @export
 gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
-                          selectedFeatures= "temp_SelectedFeatures_projection.RData",
-                          ISO3List ="ISO3s.csv",
-                          estDF,
-                          TPppBUList = "data_2000TPppBU.csv") {
+                selectedFeatures= "temp_SelectedFeatures_projection.RData",
+                ISO3List ="ISO3s.csv",
+                estDF,
+                TPppBUList = "data_2000TPppBU.csv") {
   #create an empty dataframe
   LD_DF <- data.frame()
   #load the ISO3ExceptList and convert to vector
@@ -532,11 +534,22 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
 
   #for each CTRY in ISO3Expect list load the GAM model
   for (CTRY in ISO3ExceptList) {
-    load(paste(workspacePath, "/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
+    load(paste(workspacePath, "Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
     #create dataframe of selectedFeatures TPID subset by CTRY
     isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
     #create vector of unique TPID in isoInGAM
     tpidList <- as.vector(unique(isoInGAM$TPID))
+
+    for (currTpid in tpidList) {
+      inGAM <- subset(isoInGAM, grepl(paste("^", currTpid, "$", sep=""), isoInGAM$TPID))
+      #create dataframe of originFID
+      currDF <- as.data.frame(inGAM$originFID)
+      #add model predictions for list of models
+      currDF$LD <- predict(modelList[[currTpid]], inGAM)
+      #create new dataframe
+      LD_DF <- rbind(LD_DF, currDF)
+      print(paste(currTpid, ": ", dim(LD_DF), sep=""))
+    }
   }
 
   #load the ISO3 list and convert to vector
@@ -545,7 +558,7 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
 
   #for each CTRY in ISO3Expect list load the GAM model
   for (CTRY in ISO3List) {
-    load(paste(workspacePath, "/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
+    load(paste(workspacePath, "Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
     #create dataframe of selectedFeatures TPID subset by CTRY
     isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
     #create vector of unique TPID in isoInGAM
@@ -587,9 +600,8 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
   #load file for current SSP
   NatDecBUAmtList <- read.csv(paste0("data_NationalBUAmts_", currSSP, ".csv"))
   #TODO create new column (specfically?)
-  NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,3] - NatDecBUAmtList[,2]
+  NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,(endPopColID+1)] - NatDecBUAmtList[,endPopColID]
 
-  # "NATIONAL" total amount control: update newR, newD
   #create vector of unique countries
   CtryList <- as.vector(unique(estDF$ISO))
   #create empty dataframe
@@ -751,16 +763,14 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
 
   #TODO: what is being calculated
   alloDF$newA <- alloDF$newD - estDF$dT0T1
+  year <- 2000 + (endPopColID - 1) * 10
   #write alloDF csv
-  write.csv(alloDF, file = paste0("tbl_inputToArcGIS_", currSSP, "_2010.csv"))
-            return(estDF)
-}
+  write.csv(alloDF, file = paste0("tbl_inputToArcGIS_", currSSP, "_", year, ".csv"))
 
+  return(estDF)
+}
 #TEST THE FUNCTION
 gam_dataframe(ISO3ExceptList = "ISO3s_exceptions.csv",
-               selectedFeatures= list_2$selectedFeatures,
-               ISO3List ="ISO3s.csv",
-               estDF_package,
-               TPppBUList = "data_2000TPppBU.csv")
-
-
+              selectedFeatures= "temp_SelectedFeatures_projection.RData",
+              ISO3List ="ISO3s.csv",estDF,TPppBUList = "data_2000TPppBU.csv")
+>>>>>>> ba4407fe52aaaf4e64ca4326187cd130595957d8
