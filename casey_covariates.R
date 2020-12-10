@@ -59,6 +59,7 @@ raster_slope <- function(attribute_tble, variable_arr, centroid_shp){
 #' @param size moving window size for calculating focal statistics
 #' @return focal_data
 #' @importFrom zoo rollapply
+#' @importFrom dplyr bind_cols
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
 focal_stats = function(attribute_tble, variable_arr, size) {
@@ -94,7 +95,6 @@ focal_stats = function(attribute_tble, variable_arr, size) {
 #' @param centroid_shp centroid shapefile for CONUS
 #' @param attribute_tble dataframe of raw data from SELECT model
 #' @return  centroid_lyr
-#' @importFrom dplyr merge
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
 spatial_join <- function(centroid_shp,attribute_tble) {
