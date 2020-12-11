@@ -1,29 +1,15 @@
-
-###### for 2010 ######
-
-## NOTE of CAUTION:
-## be careful with .csv files, where Excell may interpret TPID "MAR*" as dates
-## work-around: 1) copy column from source data (e.g. dbf file), 2) specify column type (in Excel), 3) save
-##              (this may need to be done everytime the file needs to be saved in Excel)
-setwd("C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select")
-######################
-######################
-currSSP <- "SSP5"
-workspacePath <- "C:\\Users\\mcgr323\\OneDrive - PNNL\\Documents\\GitHub\\select"
-trainingGrids <- read.csv("tbl_attr_1-8-dgr_training.csv")
-######################
-######################
-
-######################
-### General Trends ###
-######################
-#' @description Creates a data frame of general trends
+#' Create a data frame of general trends for 2010
+#'
+#' Extract values from the general trends model and generate predictions
+#' based off of the training dataset to create the estimates dataframe used
+#' in update_pca_2010 function
+#'
 #' @param trainingGrids data.frame; First nine fields in training data.
-#' @param general_trend_model_file
+#' @param general_trend_model_file list; lm model of general trends
 #' @return estDF
 #' @export
-general_trends <- function(trainingGrids,
-                           general_trend_model_file= "Model_GeneralTrend.RData") {
+general_trends_2010 <- function(trainingGrids,
+                                general_trend_model_file= "Model_GeneralTrend.RData") {
   # use selected columns and rename them
   estDF <- trainingGrids[,c(1, 46)]
   colnames(estDF) <- c("originFID", "x")
@@ -36,28 +22,29 @@ general_trends <- function(trainingGrids,
   return(estDF)
 }
 
-#TEST THE FUNCTION
-estDF_package <- general_trends(trainingGrids, general_trend_model_file= "Model_GeneralTrend.RData")
-all.equal(estDF_package,estDF) #TRUE
 
-######################
-# Data Updates & PCA #
-######################
-#' @description Updates the data and create PCAs
-#' @param updateGrids
-#' @param estDF dataframe created by general_trends()
-#' @param BUCovars dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
-#' @param pcaModel PCA model of BU data
-#' @param selectedFeatures slected features of model outputs
+#' Update data from PCA model predictions for 2010
+#'
+#' Predict values for BUCovars dataset given the pcaModel and
+#' use to update the BUCovars dataframe, estDF dataframe and create
+#' the selectedFeatures dataframe
+#'
+#' @param trainingGrids dataframe; inital dataframe
+#' @param estDF dataframe; created by general_trends()
+#' @param BUCovars dataframe; dataframe of focal statistics for 3 variables with moving window (3,5,7,9)
+#' @param pcaModel prcomp object; PCA model of BU data
+#' @param selectedFeatures dataframe; selected features of model outputs
+#' @param maskGrids dataframe; gridded mask data
+#' @param popGrids2000 dataframe; gridded population data 2000
 #' @importFrom stats predict
 #' @return list; extracted components from update Grids data => list(bu_covars, selectedFeatures, estDF)
 #' @export
-update_pca <- function(trainingGrids,
-                       estDF,
-                       pcaModel ="Model_BuPca.RData",
-                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
-                       maskGrids = "data_FinalMask.csv",
-                       popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv") {
+update_pca_2010 <- function(trainingGrids,
+                           estDF,
+                           pcaModel ="Model_BuPca.RData",
+                           selectedFeatures = "temp_SelectedFeatures_projection.RData",
+                           maskGrids = "data_FinalMask.csv",
+                           popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv") {
     #create dataframe of focal statistics
   BUCovars <- trainingGrids[,10:117]
   colnames(BUCovars) <- c("r80", "r80_slope", "r80_mean3", "r80_mean5", "r80_mean7", "r80_mean9", "r80_slrg3", "r80_slrg5", "r80_slrg7",
@@ -111,37 +98,27 @@ update_pca <- function(trainingGrids,
               "estDF" = estDF))
 }
 
-#TEST THE FUNCTION
-list_2 <- update_pca(trainingGrids,
-                       estDF_package,
-                       pcaModel ="Model_BuPca.RData",
-                       selectedFeatures = "temp_SelectedFeatures_projection.RData",
-                       maskGrids = "data_FinalMask.csv",
-                       popGrids2000 = "data_2000TotalPop_SSPBaseYr.csv")
 
-all.equal(list_2$bu_covars, BUCovars) #TRUE
-all.equal(list_2$selectedFeatures, selectedFeatures) #TRUE
-all.equal(list_2$estDF, estDF) #TRUE
-
-######################
-######## GAMs ########
-######################
-#' @description Create dataframe from GAM models
-#' @param ISO3ExceptList
-#' @param selectedFeatures
-#' @param ISO3List
-#' @param estDF
-#' @param TPppBUList
+#' Create dataframe from list of GAM models for 2010
+#'
+#' Extract values from GAM model list by country and calculate new fields
+#' to create new estDF and alloDF dataframes
+#'
+#' @param ISO3ExceptList dataframe; list of ISO3 exceptions
+#' @param selectedFeatures dataframe; created by update_pca()
+#' @param ISO3List dataframe; list of ISO3
+#' @param estDF estDF dataframe; created by general_trends() and expanded by update_pca()
+#' @param TPppBUListdataframe; TODO
 #' @importFrom gam gam
 #' @importFrom dplyr left_join
 #' @importFrom mgcv gam
 #' @return list; extracted components from update Grids data => list(estDF, alloDF)
 #' @export
-gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
-                          selectedFeatures= "temp_SelectedFeatures_projection.RData",
-                          ISO3List ="ISO3s.csv",
-                          estDF,
-                          TPppBUList = "data_2000TPppBU.csv") {
+gam_dataframe_2010 <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
+                              selectedFeatures= "temp_SelectedFeatures_projection.RData",
+                              ISO3List ="ISO3s.csv",
+                              estDF,
+                              TPppBUList = "data_2000TPppBU.csv") {
   #create an empty dataframe
   LD_DF <- data.frame()
   #load the ISO3ExceptList and convert to vector
@@ -374,13 +351,3 @@ gam_dataframe <- function(ISO3ExceptList = "ISO3s_exceptions.csv",
   return(list("alloDF" = alloDF,
               "estDF" = estDF))
 }
-
-#TEST THE FUNCTION
-list_3  = gam_dataframe(ISO3ExceptList = "ISO3s_exceptions.csv",
-               selectedFeatures= list_2$selectedFeatures,
-               ISO3List ="ISO3s.csv",
-               estDF = list_2$selectedFeatures,
-               TPppBUList = "data_2000TPppBU.csv")
-
-all.equal(list_3$alloDF, alloDF) #TRUE
-all.equal(list_3$estDF, estDF) #TRUE

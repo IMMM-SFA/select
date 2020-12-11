@@ -117,7 +117,7 @@ spatial_join <- function(centroid_shp,attribute_tble) {
 #' @return focal_data
 #' @author Casey R. McGrath (casey.mcgrath@pnnl.gov)
 #' @export
-combine_df <- function(cent_lyr, output_slope, focal_3, focal_5, focal_7, focal_9, ){
+combine_df <- function(cent_lyr, output_slope, focal_3, focal_5, focal_7, focal_9){
   names(output_slope) = c(
     "newR_slope", "newD_slope", "newA_slope")
   names(focal_3) = c(

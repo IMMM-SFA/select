@@ -2,15 +2,15 @@ Package: select
 Type: Package
 Title: The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model package 
 Version: 0.1.0
-Author@R:c(person("Jing", "Gao", 
+Authors:c(person("Jing", "Gao", 
             email = "jinggao@udel.edu", 
             role = "aut"),
             person("Casey", "McGrath", 
-	        email = "casey.mcgrath@pnnl.gov", 
-	        role = "aut"),
-	        person("Chris", "Vernon", 
-	        email = "chris.vernon@pnnl.gov", 
-	        role = "aut")
+	          email = "casey.mcgrath@pnnl.gov", 
+  	        role = "aut"),
+  	        person("Chris", "Vernon", 
+  	        email = "chris.vernon@pnnl.gov", 
+  	        role = "aut"))
 Maintainer: Casey McGrath <casey.mcgrath@pnnl.gov>
 Description: Package suporting model extraction and associated statistics for dataframes created for 
              The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model
