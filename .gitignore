@@ -1,6 +1,10 @@
 # system files
 .DS_Store
 
+#select data
+/SELECT_data
+/.idea
+
 # History files
 .Rhistory
 .Rapp.history
