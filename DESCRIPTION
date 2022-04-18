@@ -1,12 +1,28 @@
 Package: select
 Type: Package
-Title: What the Package Does (Title Case)
+Title: The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model package 
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors:c(person("Jing", "Gao", 
+            email = "jinggao@udel.edu", 
+            role = "aut"),
+            person("Casey", "McGrath", 
+	          email = "casey.mcgrath@pnnl.gov", 
+  	        role = "aut"),
+  	        person("Chris", "Vernon", 
+  	        email = "chris.vernon@pnnl.gov", 
+  	        role = "aut"))
+Maintainer: Casey McGrath <casey.mcgrath@pnnl.gov>
+Description: Package suporting model extraction and associated statistics for dataframes created for 
+             The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model
+License: BSD2-Clause
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 6.1.1
+Depends:
+    R (>= 3.6.0),landsat, raster, zoo, dplyr, gam, mgcv, foreach, feather, tools, stats 
+RoxygenNote: 7.1.1
+VignetteBuilder: knitr
+Suggests:
+    testthat (>= 2.1.0),
+    knitr,
+    rmarkdown,
+    pkgdown

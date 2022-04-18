@@ -28,3 +28,5 @@ polygon_to_raster <- function(sf, raster, field = NULL, fun, background = NA_rea
 
   return(fasterize(sf, raster, field, fun, background, by))
 }
+
+
