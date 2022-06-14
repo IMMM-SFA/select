@@ -1,5 +1,6 @@
+import sys
 import arcpy
-arcpy.env.workspace = "C:\\Users\\jinggao\\Desktop\\ArcGISMaterials_model\\Projection_CovariateUpdates\\"
+arcpy.env.workspace = "./"
 arcpy.env.overwriteOutput = True
 
 ####################
@@ -8,9 +9,12 @@ arcpy.env.overwriteOutput = True
 # the three data columns, which are frequently defaulted as LONG by Arc, the output file should be ~65MB
 ####################
 
-attrTblFile = "tbl_inputAttr.dbf"
-gridCntrFile = "C:\\Users\\jinggao\\Desktop\\ArcGISMaterials_model\\LandMask_1-8-degree_fishnet_centroids.shp"
-rasterBenchmarkFile = "C:\\Users\\jinggao\\Desktop\\ArcGISMaterials_model\\LandMask_1-8-degree_raster.img"
+ssp = sys.argv[1]
+year = sys.argv[2]
+
+attrTblFile = f"tbl_inputAttr_{ssp}_{year}.dbf"
+gridCntrFile = "./LandMask_1-8-degree_DATA/LandMask_1-8-degree_fishnet_centroids.shp"
+rasterBenchmarkFile = "./LandMask_1-8-degree_DATA/LandMask_1-8-degree_raster.img"
 
 # set geoprocessing environment parameters to comply with raster benchmark file:
 #   output coordinates, snap raster, raster analysis - cell size, raster storage - LZW compression
@@ -29,7 +33,7 @@ arcpy.AddJoin_management("gridCntrLayer", "originFID", attrTblFile, "originFID",
 # convert attributes to rasters, using iterations (~2 min per raster)
 for outName in fileNameArr:
     arcpy.AddMessage("start raster conversion: "+outName)
-    arcpy.PointToRaster_conversion("gridCntrLayer", ("tbl_inputAttr."+outName), outName, "MEAN")
+    arcpy.PointToRaster_conversion("gridCntrLayer", (f"tbl_inputAttr_{ssp}_{year}."+outName), outName, "MEAN")
     arcpy.AddMessage("complete raster conversion: "+outName)
 
 # load necesary tools
@@ -76,13 +80,15 @@ arcpy.AddMessage("complete slope & slope range")
 
 # convert 1/8-dgr fishnet to centroids
 arcpy.AddMessage("start centroid conversion")
-fishnetFile = "C:\\Users\\jinggao\\Desktop\\ArcGISMaterials_model\\LandMask_1-8-degree_fishnet.shp"
-centroidFile = "_tempCentroid"+fileNameArr[0]+".shp"
-arcpy.FeatureToPoint_management(fishnetFile, centroidFile, "CENTROID")
+#fishnetFile = "./LandMask_1-8-degree_DATA/LandMask_1-8-degree_fishnet.shp"
+for i in range(0, len(fileNameArr), 1):
+    centroidFile = "_tempCentroid"+fileNameArr[i]+".shp"
+    #arcpy.FeatureToPoint_management(fishnetFile, centroidFile, "CENTROID")
+    arcpy.FeatureToPoint_management(gridCntrFile, centroidFile, "INSIDE")
 arcpy.AddMessage("complete centroid conversion")
-for i in range(1, len(fileNameArr), 1):
-    arcpy.Copy_management(centroidFile, ("_tempCentroid"+fileNameArr[i]+".shp"))
-arcpy.AddMessage("complete centroid copies")
+# for i in range(1, len(fileNameArr), 1):
+#     arcpy.Copy_management(centroidFile, ("_tempCentroid"+fileNameArr[i]+".shp"))
+# arcpy.AddMessage("complete centroid copies")
 
 # extract raster values to centroids
 arcpy.AddMessage("start raster value extraction")

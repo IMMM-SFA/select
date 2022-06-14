@@ -8,11 +8,17 @@
 
 ######################
 ######################
+args = commandArgs(trailingOnly=TRUE)
+if (length(args) < 2) {
+  stop("Please supply as an argument the SSP to process and the decade of the 21st centure; i.e. SSP5 2.n", call.=FALSE)
+}
+
 # make sure temp_tbl_attr_updates.csv is sorted on originFID (low to high)
-endPopColID <- 6 # 3 for 2020, +1 per later decade, 11 for 2100;
+decade <- (strtoi(args[2]))
+endPopColID <- (1 + decade) # 3 for 2020, +1 per later decade, 11 for 2100;
                   # differently, for National BUAmts, this is the column ID for the beginning of the decade, i.e. 3 for 2010
-currSSP <- "SSP1"
-workspacePath <- "C:/Users/jinggao/Desktop/RMaterials_model/1_SpatialModel/"
+currSSP <- args[1]
+workspacePath <- "./"
 ######################
 ######################
 
@@ -20,12 +26,12 @@ workspacePath <- "C:/Users/jinggao/Desktop/RMaterials_model/1_SpatialModel/"
 ### General Trends ###
 ######################
 
-updateGrids <- read.csv("temp_tbl_attr_updates.csv")
+updateGrids <- read.csv(paste0("temp_tbl_attr_updates_", currSSP, "_", 2000 + 10 * (decade - 1), ".csv"))
 
 estDF <- updateGrids[,1:2]
 colnames(estDF) <- c("originFID", "x")
 
-load("Model_GeneralTrend.RData")
+load("RModels/Model_GeneralTrend.RData")
 estDF$GT <- predict(GeneralTrendModel, estDF)
 rm(GeneralTrendModel)
 estDF <- subset(estDF, select=c(-x))
@@ -34,7 +40,7 @@ estDF <- subset(estDF, select=c(-x))
 # Data Updates & PCA #
 ######################
 
-load("temp_tbl_attr_old.RData")
+load(paste0("temp_tbl_attr_old_", currSSP, "_", 2000 + 10 * (decade - 1), ".RData"))
 oldGrids <- BUCovars
 
 BUCovars <- cbind(oldGrids[,20:55], updateGrids[,2:19], oldGrids[,74:91], updateGrids[,20:55])
@@ -53,7 +59,7 @@ colnames(BUCovars) <- c("r80", "r80_slope", "r80_mean3", "r80_mean5", "r80_mean7
                         "a8000mean7", "a8000mean9", "a8000slrg3", "a8000slrg5", "a8000slrg7", "a8000slrg9", "a8000std3", "a8000std5",
                         "a8000std7", "a8000std9", "a8000stps3", "a8000stps5", "a8000stps7", "a8000stps9")
 
-load("Model_BuPca.RData")
+load("RModels/Model_BuPca.RData")
 PCs <- predict(pcaModel, newdata = BUCovars)
 rm(pcaModel)
 
@@ -61,11 +67,11 @@ estDF$rT1 <- BUCovars$r00
 estDF$dT0T1 <- BUCovars$d9000
 BUCovars <- cbind(estDF$originFID, BUCovars)
 colnames(BUCovars)[1] <- "originFID"
-save(BUCovars, file = "temp_tbl_attr_old.RData")
+save(BUCovars, file = paste0("temp_tbl_attr_old_", currSSP, "_", 2000 + 10 * decade, ".RData"))
 rm(BUCovars)
 
-load("temp_SelectedFeatures_projection.RData")
-popGrids <- read.csv(paste0("data_", currSSP, "TotalPopSeries.csv"))
+load(paste0("temp_SelectedFeatures_projection_", currSSP, "_", 2000 + 10 * (decade - 1), ".RData"))
+popGrids <- read.csv(paste0("InputData/data_", currSSP, "TotalPopSeries.csv"))
 
 estDF$GrumpLndAr <- selectedFeatures$GrumpLndAr
 estDF$mask <- selectedFeatures$mask
@@ -81,7 +87,7 @@ rm(popGrids)
 
 selectedFeatures <- cbind(selectedFeatures[,1:9], PCs[,1:15], selectedFeatures[,25:27])
 rm(PCs)
-save(selectedFeatures, file = "temp_SelectedFeatures_projection.RData")
+save(selectedFeatures, file = paste0("temp_SelectedFeatures_projection_", currSSP, "_", 2000 + 10 * decade, ".RData"))
 
 ######################
 ######## GAMs ########
@@ -89,12 +95,12 @@ save(selectedFeatures, file = "temp_SelectedFeatures_projection.RData")
 
 LD_DF <- data.frame()
 
-ISO3ExceptList <- read.csv("ISO3s_exceptions.csv")
+ISO3ExceptList <- read.csv("InputData/ISO3s_exceptions.csv")
 ISO3ExceptList <- as.vector(names(ISO3ExceptList))
 
 library(gam)
 for (CTRY in ISO3ExceptList) {
-  load(paste(workspacePath, "Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
+  load(paste(workspacePath, "RModels/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
   isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
   tpidList <- as.vector(unique(isoInGAM$TPID))
   for (currTpid in tpidList) {
@@ -115,7 +121,7 @@ ISO3List <- as.vector(names(ISO3List))
 
 library(mgcv)
 for (CTRY in ISO3List) {
-  load(paste(workspacePath, "Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
+  load(paste(workspacePath, "RModels/Model_GAMs/GAMModels_LD_", CTRY, ".RData", sep=""))
   isoInGAM <- subset(selectedFeatures, grepl(paste("^", CTRY, sep=""), selectedFeatures$TPID))
   tpidList <- as.vector(unique(isoInGAM$TPID))
   for (currTpid in tpidList) {
@@ -144,16 +150,16 @@ estDF$amtD <- estDF$GrumpLndAr * estDF$newD
 estDF$availLnd <- estDF$GrumpLndAr * (estDF$mask - estDF$rT1)
 estDF$availLnd <- ifelse(estDF$availLnd < 0, 0, estDF$availLnd) # in case of rounding error
 
-save(estDF, file = "temp_estDF.RData")
+# save(estDF, file = "temp_estDF.RData")
 # load("temp_estDF.RData")
 
-NatDecBUAmtList <- read.csv(paste0("data_NationalBUAmts_", currSSP, ".csv"))
+NatDecBUAmtList <- read.csv(paste0("InputData/data_NationalBUAmts_", currSSP, ".csv"))
 NatDecBUAmtList$BUAmtChg <- NatDecBUAmtList[,(endPopColID+1)] - NatDecBUAmtList[,endPopColID]
 
 # "NATIONAL" total amount control: update newR, newD
 CtryList <- as.vector(unique(estDF$ISO))
 alloDF <- data.frame()
-TPppBUList <- read.csv("data_2000TPppBU.csv")
+TPppBUList <- read.csv("InputData/data_2000TPppBU.csv")
 for (CTRY in CtryList) {
   ctryEstDF <- subset(estDF, grepl(paste("^", CTRY, "$", sep=""), estDF$ISO))
   
@@ -273,6 +279,9 @@ for (CTRY in CtryList) {
           } else {
             sumRT1 <- sum(tpidEstDF[tpidEstDF$overflow < 0, ]$rT1)
             scaler <- sumOverflow / sumRT1
+            if (!is.finite(scaler)) {
+              scaler <- 0
+            }
             tpidEstDF$amtD <- ifelse(tpidEstDF$overflow < 0, (tpidEstDF$rT1 * scaler + tpidEstDF$amtD), tpidEstDF$amtD)
           }
           tpidEstDF$overflow <- tpidEstDF$amtD - tpidEstDF$availLnd
