@@ -34,13 +34,9 @@ Several requirements must be met in order to successfully run the script:
     * click the clone icon next to the 'arcgispro-py3' entry
     * activate the new environment (requires restarting ArcGIS)
 * The `geopandas` Python package
-  * Install using the ArcGIS package manager:
-    * open ArcGIS
-    * navigate to Settings
-    * navigate to Python
-    * ensure your cloned environment is active
-    * click Add Packages
-    * choose `geopandas` and click Install
+  * Install using conda within the cloned environment:
+    * see the bug report [here](https://stackoverflow.com/questions/69523996/arcpy-scripts-keep-giving-an-error-typeerror-expected-string-or-bytes-like-obj)
+    * install with command: `conda install geopandas libtiff=4.0.10`
 * Patience
 
 Once all the above requirements are met, run `auto_select.py` like so:
