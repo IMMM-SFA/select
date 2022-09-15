@@ -88,13 +88,18 @@ def ssp_to_tif(ssp: str, output_path):
         )
 
 
-def downscale(ssp: str, output_path: str):
+def downscale(ssp: str, output_path: str, start_decade: int = None):
     subprocess.check_call(
-        ['python', 'script_Downscaling_OneSSP2000-2100.py', ssp, str(Path(output_path).absolute())],
+        [
+            'python',
+            'script_Downscaling_OneSSP2000-2100.py',
+            ssp,
+            str(Path(output_path).absolute()),
+            start_decade if start_decade is not None else ''
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    pass
 
 
 def auto_select(ssp: str, start_decade: int = 1, output_path: str = './output'):

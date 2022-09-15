@@ -18,8 +18,8 @@ Several requirements must be met in order to successfully run the script:
 * ArcGIS installed and licensed with the Spatial package
   * Tested on ArcGIS Pro 2.8
 * R installed and RScript available on the PATH
-  * Tested on R-4.2.0
-  * To add RScript to the path for the current terminal session, run `path %PATH%;C:\Program Files\R\R-4.2.0\bin`, replacing with the actual path on your system
+  * Tested on R-4.0.3
+  * To add RScript to the path for the current terminal session, run `path %PATH%;C:\Program Files\R\R-4.0.3\bin`, replacing with the actual path on your system
 * The following R libraries must be installed:
   * `gam`
   * `mgcv`

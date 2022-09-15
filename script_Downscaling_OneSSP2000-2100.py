@@ -3,9 +3,14 @@ import arcpy
 arcpy.CheckOutExtension("spatial")
 
 currSSP = sys.argv[1]
+
 output_path = './output'
 if len(sys.argv) > 2:
     output_path = sys.argv[2]
+
+start_decade = 1
+if len(sys.argv) > 3:
+    start_decade = int(sys.argv[3])
 
 #### set parameters ####
 # CONSTANT: 1/8-dgr input path
@@ -27,7 +32,7 @@ arcpy.env.snapRaster = fineLandAreaR
 arcpy.env.cellSize = fineLandAreaR
 arcpy.env.compression = 'LZW'
 
-for endYr in range(2010, 2101, 10):
+for endYr in range(2000 + (start_decade * 10), 2101, 10):
     beginYr = endYr-10
     coarseZoneR = arcpy.Raster("Fishnet_of18dgr_in1km_forZonalStat.tif")
     flagR = arcpy.Raster("1km_flag_allZero.tif")
