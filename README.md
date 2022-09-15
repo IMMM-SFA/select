@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7083151.svg)](https://doi.org/10.5281/zenodo.7083151)
+
 # SELECT
 
 The Spatially-Explicit, Long-term, Empirical City developmenT (SELECT) model.
